@@ -20,19 +20,31 @@ React + Vite frontend. Routes:
 src/
 ├── types/                  # Shared TypeScript interfaces
 │   ├── auth.ts             # User, LoginRequest, LoginResponse
-│   └── note.ts             # Note
+│   ├── scinote.ts          # SciNote (id, title, kind, createdAt, formData)
+│   └── wizardForm.ts       # WizardFormData (step2–step6 data shapes)
 ├── api/                    # All HTTP calls (one file per domain)
 │   ├── client.ts           # apiFetch() base wrapper + ApiError class
 │   └── auth.ts             # login()
+├── contexts/               # React contexts (single source of truth for shared state)
+│   ├── SciNoteStoreContext.tsx       # Mutable list of SciNotes; createSciNote() adds new ones
+│   └── NewExperimentDraftContext.tsx # Live draft name during /personal/new-experiment
 ├── hooks/                  # Business logic hooks (no UI)
-│   └── useLogin.ts         # Login form state, validation, submission
+│   ├── useLogin.ts         # Login form state, validation, submission
+│   ├── useWizardForm.ts    # Wizard form state + populateFromAI + canFinish
+│   └── useReferences.ts    # Upload file list + analysis state
+├── data/                   # Static placeholder data
+│   ├── scinotes.ts         # PLACEHOLDER_SCINOTES (kind: "placeholder")
+│   └── aiMockFill.ts       # AI_MOCK_FILL — mock wizard form data for upload path
 ├── config/                 # App configuration data (no components)
 │   └── navigation.ts       # NavItem / NavGroup types + TOP_NAV / NAV_GROUPS arrays
 ├── components/
 │   ├── layout/
-│   │   ├── AppLayout.tsx   # Authenticated page shell (sidebar + topbar + main)
-│   │   └── TopBar.tsx      # Top header bar component
-│   └── ui/                 # shadcn/ui primitives
+│   │   ├── AuthenticatedLayout.tsx  # Wraps SciNoteStoreProvider + NewExperimentDraftProvider; renders sidebar + page content
+│   │   ├── AppLayout.tsx            # Standard page shell (TopBar + scrollable main)
+│   │   └── TopBar.tsx               # Top header bar component
+│   ├── form/
+│   │   └── FormField.tsx            # Label + Input/Textarea wrapper used in wizard steps
+│   └── ui/                          # shadcn/ui primitives
 └── pages/
     ├── login/
     │   ├── LoginPage.tsx    # Page shell
@@ -41,17 +53,29 @@ src/
     │   ├── CheckboxField.tsx
     │   └── AuthButton.tsx
     ├── home/
-    │   ├── AppSidebar.tsx   # Sidebar — reads config/navigation.ts + useSciNotes hook
+    │   ├── AppSidebar.tsx   # Sidebar — reads SciNoteStoreContext + NewExperimentDraftContext
     │   ├── NavLink.tsx      # Single nav link (active state)
     │   ├── QueryBox.tsx     # AI text input card
     │   ├── NoteCard.tsx     # Single note card
-    │   └── RecentNotes.tsx  # Recent notes section (list of NoteCard)
+    │   └── RecentNotes.tsx  # Recent notes section
     ├── personal/
-    │   └── NewExperimentPage.tsx  # Placeholder — new SciNote creation
+    │   ├── NewExperimentPage.tsx   # Experiment initialization wizard (6 steps)
+    │   ├── ExperimentDetailPage.tsx # SciNote detail page for wizard-created notes
+    │   ├── SciNoteDetailPage.tsx   # Legacy stub for placeholder notes
+    │   └── new-experiment/
+    │       ├── StepNav.tsx         # Left wizard step navigator + "开始记录实验" button
+    │       ├── StepFooter.tsx      # Prev/Next navigation footer
+    │       └── steps/              # One component per wizard step (Step1Choice, Step1References, Step2System, …)
     ├── HomePage.tsx         # Composes AppLayout + QueryBox + RecentNotes
     ├── RequestAccessPage.tsx
     └── not-found.tsx
 ```
+
+**State architecture:**
+- `SciNoteStoreContext` — single source of truth for all SciNotes (initialized with placeholder data + all wizard-created notes). Provided at `AuthenticatedLayout` level so sidebar and pages share the same list.
+- `NewExperimentDraftContext` — tracks the live experiment name during initialization (string | null). The wizard page publishes changes; the sidebar reads it to show the draft entry. Cleared on unmount.
+- `useWizardForm` — local hook inside `NewExperimentPage`, owns step2–6 form state. `canFinish = step2.experimentName.trim().length > 0`.
+- Wizard-created SciNotes link to `/personal/experiment/:id`; placeholder ones link to `/personal/note/:id`.
 
 **Conventions:**
 - Pages compose layout + feature components only; no raw fetch/state logic inside pages
@@ -59,17 +83,14 @@ src/
 - Hooks own form/business state and call `api/` functions
 - `config/navigation.ts` is pure data — no JSX; sidebar reads it at render time
 - `data/` holds placeholder data that mirrors future API responses
-- New static nav items: add to `NAV_GROUPS` in `config/navigation.ts`
-- New dynamic personal SciNotes: managed by `hooks/useSciNotes.ts` (replace with API when ready)
-- Sidebar "个人" group items come from `useSciNotes`, not from static config
 - `NavGroup.action` — optional `{ label, href }` renders a "+" button next to the group title
-- New API endpoints: add a function in the matching `api/` file
 
 **Routes:**
 - `/home` — main home page
 - `/signup` — access by invitation (no public registration)
-- `/personal/new-experiment` — placeholder for new SciNote creation
-- `/personal/note/:id` — individual SciNote (not yet routed, navigation hrefs exist)
+- `/personal/new-experiment` — experiment initialization wizard (6 steps)
+- `/personal/experiment/:id` — detail page for wizard-created SciNotes
+- `/personal/note/:id` — legacy stub for placeholder SciNotes
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 

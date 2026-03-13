@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { StepNav } from "./new-experiment/StepNav";
 import { StepFooter } from "./new-experiment/StepFooter";
 import { Step1Choice } from "./new-experiment/steps/Step1Choice";
@@ -11,6 +12,7 @@ import { Step6Data } from "./new-experiment/steps/Step6Data";
 import { useReferences } from "@/hooks/useReferences";
 import { useWizardForm } from "@/hooks/useWizardForm";
 import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
+import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import { AI_MOCK_FILL } from "@/data/aiMockFill";
 
 const TOTAL_STEPS = 6;
@@ -32,6 +34,8 @@ export function NewExperimentPage() {
   const refs = useReferences([]);
   const form = useWizardForm();
 
+  const [, navigate] = useLocation();
+  const { createSciNote } = useSciNoteStore();
   const { setDraftName } = useNewExperimentDraft();
 
   // Publish experiment name to sidebar in real time.
@@ -93,8 +97,9 @@ export function NewExperimentPage() {
   }
 
   function handleFinish() {
-    // TODO: submit to backend when ready
-    console.log("Finish initialization", form.data);
+    const id = createSciNote(form.data);
+    // The draft context cleanup fires automatically on unmount (navigate away).
+    navigate(`/personal/experiment/${id}`);
   }
 
   function renderStepContent() {

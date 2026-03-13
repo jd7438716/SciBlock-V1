@@ -9,6 +9,7 @@ import { RequestAccessPage } from "@/pages/RequestAccessPage";
 import { HomePage } from "@/pages/HomePage";
 import { NewExperimentPage } from "@/pages/personal/NewExperimentPage";
 import { SciNoteDetailPage } from "@/pages/personal/SciNoteDetailPage";
+import { ExperimentDetailPage } from "@/pages/personal/ExperimentDetailPage";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,9 @@ function AuthenticatedRouter() {
       <Switch>
         <Route path="/home" component={HomePage} />
         <Route path="/personal/new-experiment" component={NewExperimentPage} />
+        {/* Wizard-created SciNotes — detail page with full form data */}
+        <Route path="/personal/experiment/:id" component={ExperimentDetailPage} />
+        {/* Placeholder SciNotes — legacy stub */}
         <Route path="/personal/note/:id" component={SciNoteDetailPage} />
         <Route path="/">
           {() => {

@@ -1,6 +1,7 @@
 import React from "react";
 import { AppSidebar } from "@/pages/home/AppSidebar";
 import { NewExperimentDraftProvider } from "@/contexts/NewExperimentDraftContext";
+import { SciNoteStoreProvider } from "@/contexts/SciNoteStoreContext";
 
 interface Props {
   children: React.ReactNode;
@@ -11,18 +12,21 @@ interface Props {
  * Renders the persistent sidebar on the left; page content fills the right.
  * Individual pages must NOT render their own sidebar.
  *
- * NewExperimentDraftProvider is placed here so that both AppSidebar and
- * NewExperimentPage share the same draft-name state without prop drilling.
+ * SciNoteStoreProvider — single source of truth for all SciNote records.
+ * NewExperimentDraftProvider — live draft name shared between the init wizard
+ *   and the sidebar.
  */
 export function AuthenticatedLayout({ children }: Props) {
   return (
-    <NewExperimentDraftProvider>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
-        <AppSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          {children}
+    <SciNoteStoreProvider>
+      <NewExperimentDraftProvider>
+        <div className="flex h-screen overflow-hidden bg-gray-50">
+          <AppSidebar />
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {children}
+          </div>
         </div>
-      </div>
-    </NewExperimentDraftProvider>
+      </NewExperimentDraftProvider>
+    </SciNoteStoreProvider>
   );
 }

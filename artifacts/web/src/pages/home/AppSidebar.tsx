@@ -2,12 +2,19 @@ import React from "react";
 import { useLocation, Link } from "wouter";
 import { LayoutGrid, Plus, BookOpen } from "lucide-react";
 import { TOP_NAV, NAV_GROUPS } from "@/config/navigation";
-import { useSciNotes } from "@/hooks/useSciNotes";
+import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
 import { NavLink } from "./NavLink";
 import type { NavItem, NavGroup } from "@/config/navigation";
 
 const DRAFT_FALLBACK = "未命名实验";
+
+/** Resolve the detail-page href for a SciNote based on its kind. */
+function sciNoteHref(kind: "placeholder" | "wizard", id: string): string {
+  return kind === "wizard"
+    ? `/personal/experiment/${id}`
+    : `/personal/note/${id}`;
+}
 
 function GroupHeader({ group }: { group: NavGroup }) {
   return (
@@ -30,10 +37,10 @@ function GroupHeader({ group }: { group: NavGroup }) {
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { notes } = useSciNotes();
+  const { notes } = useSciNoteStore();
   const { draftName } = useNewExperimentDraft();
 
-  // The in-progress experiment initialization, shown at the top of 个人 when active.
+  // The in-progress experiment initialization — shown at the top of 个人 when active.
   const draftItem: NavItem | null =
     draftName !== null
       ? {
@@ -43,12 +50,12 @@ export function AppSidebar() {
         }
       : null;
 
-  // Build the personal group items from SciNotes at render time.
+  // Build the personal group items: draft entry first, then all SciNotes.
   const sciNoteItems: NavItem[] = [
     ...(draftItem ? [draftItem] : []),
     ...notes.map((n) => ({
       label: n.title,
-      href: `/personal/note/${n.id}`,
+      href: sciNoteHref(n.kind, n.id),
       Icon: BookOpen,
     })),
   ];
