@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { StepNav } from "./new-experiment/StepNav";
 import { StepFooter } from "./new-experiment/StepFooter";
@@ -11,6 +11,7 @@ import { Step5Measurement } from "./new-experiment/steps/Step5Measurement";
 import { Step6Data } from "./new-experiment/steps/Step6Data";
 import { useReferences } from "@/hooks/useReferences";
 import { useWizardForm } from "@/hooks/useWizardForm";
+import { useAiAnalysis } from "@/hooks/useAiAnalysis";
 import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import { getExperimentName } from "@/types/experimentFields";
@@ -18,20 +19,12 @@ import { AI_MOCK_FILL } from "@/data/aiMockFill";
 
 const TOTAL_STEPS = 6;
 
-/**
- * Steps unlocked in the nav after AI analysis completes.
- * Step 6 (实验数据) is excluded — data is collected during the experiment, not pre-filled.
- */
-const UPLOAD_UNLOCKED_STEPS: ReadonlySet<number> = new Set([2, 3, 4, 5]);
-
 type Step1Path = "choice" | "uploading";
 
 export function NewExperimentPage() {
   const [activeStepId, setActiveStepId] = useState(1);
   const [step1Path, setStep1Path] = useState<Step1Path>("choice");
-  const [reviewedStepIds, setReviewedStepIds] = useState<Set<number>>(new Set());
 
-  // Upload path: start empty — user selects their own files.
   const refs = useReferences([]);
   const form = useWizardForm();
 
@@ -39,9 +32,21 @@ export function NewExperimentPage() {
   const { createSciNote } = useSciNoteStore();
   const { setDraftName } = useNewExperimentDraft();
 
+  // Guard so form is populated only once.
+  const hasPopulated = useRef(false);
+
+  // Sequential AI analysis flow — starts when user clicks "开始分析".
+  // onComplete fires after all steps 1–5 reach "generated".
+  const aiAnalysis = useAiAnalysis({
+    onComplete: () => {
+      if (!hasPopulated.current) {
+        hasPopulated.current = true;
+        form.populateFromAI(AI_MOCK_FILL);
+      }
+    },
+  });
+
   // Publish experiment name to sidebar in real time.
-  // Derived from the "实验名称" field in the configurable field list.
-  // Empty string is fine — the sidebar renders "未命名实验" as a fallback.
   const experimentName = getExperimentName(form.data.step2.fields);
   useEffect(() => {
     setDraftName(experimentName);
@@ -54,39 +59,12 @@ export function NewExperimentPage() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Guard so we only populate from AI once per session.
-  const hasPopulated = useRef(false);
-  useEffect(() => {
-    if (refs.analysisComplete && !hasPopulated.current) {
-      hasPopulated.current = true;
-      form.populateFromAI(AI_MOCK_FILL);
-    }
-  }, [refs.analysisComplete]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  /**
-   * Which steps show the AI-ready indicator in the left nav.
-   * Only active for the upload path once analysis finishes.
-   */
-  const unlockedStepIds = useMemo<ReadonlySet<number> | undefined>(() => {
-    if (step1Path === "uploading" && refs.analysisComplete) {
-      return UPLOAD_UNLOCKED_STEPS;
-    }
-    return undefined;
-  }, [step1Path, refs.analysisComplete]);
-
   function goToStep(stepId: number) {
     if (stepId < 1 || stepId > TOTAL_STEPS) return;
     if (stepId === 1) setStep1Path("choice");
 
-    // Mark as reviewed when the user first visits an unlocked step.
-    if (unlockedStepIds?.has(stepId)) {
-      setReviewedStepIds((prev) => {
-        if (prev.has(stepId)) return prev;
-        const next = new Set(prev);
-        next.add(stepId);
-        return next;
-      });
-    }
+    // Transition "generated" → "reviewed" when user visits the step.
+    aiAnalysis.markReviewed(stepId);
 
     setActiveStepId(stepId);
   }
@@ -99,9 +77,18 @@ export function NewExperimentPage() {
     goToStep(2);
   }
 
+  /**
+   * Triggered by "开始分析" button in Step1References.
+   * - refs.analyze()     → drives file-item status UI (pending → analyzing → done)
+   * - aiAnalysis.start() → drives the step-nav sequential progress
+   */
+  function handleAnalyze() {
+    refs.analyze();
+    aiAnalysis.start();
+  }
+
   function handleFinish() {
     const id = createSciNote(form.data);
-    // The draft context cleanup fires automatically on unmount (navigate away).
     navigate(`/personal/experiment/${id}`);
   }
 
@@ -121,10 +108,10 @@ export function NewExperimentPage() {
             files={refs.files}
             onAddFiles={refs.addFiles}
             onRemoveFile={refs.removeFile}
-            onAnalyze={refs.analyze}
+            onAnalyze={handleAnalyze}
             canAnalyze={refs.canAnalyze}
-            isAnalyzing={refs.isAnalyzing}
-            analysisComplete={refs.analysisComplete}
+            isAnalyzing={aiAnalysis.isRunning}
+            analysisComplete={aiAnalysis.isComplete}
             onProceed={() => goToStep(2)}
           />
         );
@@ -192,8 +179,7 @@ export function NewExperimentPage() {
           onStepClick={goToStep}
           canFinish={form.canFinish}
           onFinish={handleFinish}
-          unlockedStepIds={unlockedStepIds}
-          reviewedStepIds={reviewedStepIds}
+          aiStatuses={aiAnalysis.statuses}
         />
       </aside>
 
