@@ -1,50 +1,134 @@
-import React from "react";
-import { UploadCloud, FileText, X } from "lucide-react";
-import { PLACEHOLDER_REFERENCES } from "@/data/experimentReferences";
-import type { ImportedFile } from "@/types/experiment";
+import React, { useRef } from "react";
+import { UploadCloud, FileText, X, Loader2, CheckCircle2, Clock } from "lucide-react";
+import type { ImportedFile, FileStatus } from "@/types/experiment";
 
-interface Props {
-  files: ImportedFile[];
-  onRemoveFile: (id: string) => void;
-  onAnalyze: () => void;
-}
+// ─── Status badge ────────────────────────────────────────────────────────────
 
-function UploadArea() {
+const STATUS_CONFIG: Record<
+  FileStatus,
+  { label: string; className: string; Icon?: React.ElementType }
+> = {
+  pending: {
+    label: "待分析",
+    className: "bg-gray-100 text-gray-500",
+  },
+  analyzing: {
+    label: "分析中",
+    className: "bg-amber-50 text-amber-600",
+    Icon: Loader2,
+  },
+  done: {
+    label: "已完成",
+    className: "bg-green-50 text-green-600",
+    Icon: CheckCircle2,
+  },
+};
+
+function StatusBadge({ status }: { status: FileStatus }) {
+  const cfg = STATUS_CONFIG[status];
   return (
-    <div className="border-2 border-dashed border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3 text-center hover:border-gray-300 transition-colors cursor-pointer bg-gray-50">
-      <UploadCloud size={32} className="text-gray-300" />
-      <div>
-        <p className="text-sm font-medium text-gray-600">拖入文件或点击上传</p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          支持 PDF、Word、TXT 等格式
-        </p>
-      </div>
-    </div>
+    <span
+      className={[
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0",
+        cfg.className,
+      ].join(" ")}
+    >
+      {cfg.Icon && (
+        <cfg.Icon
+          size={11}
+          className={status === "analyzing" ? "animate-spin" : ""}
+        />
+      )}
+      {cfg.label}
+    </span>
   );
 }
 
-function FileRow({
-  file,
-  onRemove,
-}: {
+// ─── Upload area ─────────────────────────────────────────────────────────────
+
+interface UploadAreaProps {
+  onFilesSelected: (files: FileList) => void;
+}
+
+function UploadArea({ onFilesSelected }: UploadAreaProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleClick() {
+    inputRef.current?.click();
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      onFilesSelected(e.target.files);
+      // Reset so the same file can be added again if removed.
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleChange}
+      />
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleClick}
+        onKeyDown={(e) => e.key === "Enter" && handleClick()}
+        className="border-2 border-dashed border-gray-200 rounded-xl p-10 flex flex-col items-center justify-center gap-3 text-center hover:border-gray-300 hover:bg-gray-100 transition-colors cursor-pointer bg-gray-50"
+      >
+        <UploadCloud size={32} className="text-gray-300" />
+        <div>
+          <p className="text-sm font-medium text-gray-600">拖入文件或点击上传</p>
+          <p className="text-xs text-gray-400 mt-0.5">支持 PDF、Word、TXT 等格式</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── File row ─────────────────────────────────────────────────────────────────
+
+interface FileRowProps {
   file: ImportedFile;
   onRemove: () => void;
-}) {
+}
+
+function FileRow({ file, onRemove }: FileRowProps) {
+  const removable = file.status !== "analyzing";
+
   return (
     <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
       <div className="w-8 h-8 rounded-md bg-white border border-gray-200 flex items-center justify-center flex-shrink-0">
         <FileText size={14} className="text-gray-500" />
       </div>
+
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-800 truncate">{file.name}</p>
-        <p className="text-xs text-gray-400">
-          {file.fileType} · {file.size}
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <Clock size={10} className="text-gray-400 flex-shrink-0" />
+          <p className="text-xs text-gray-400">
+            {file.fileType} · {file.size} · 导入于 {file.importedAt}
+          </p>
+        </div>
       </div>
+
+      <StatusBadge status={file.status} />
+
       <button
         onClick={onRemove}
+        disabled={!removable}
         aria-label="移除文件"
-        className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors flex-shrink-0"
+        className={[
+          "p-1 rounded transition-colors flex-shrink-0",
+          removable
+            ? "text-gray-400 hover:text-gray-700 hover:bg-gray-200"
+            : "text-gray-200 cursor-not-allowed",
+        ].join(" ")}
       >
         <X size={13} />
       </button>
@@ -52,7 +136,25 @@ function FileRow({
   );
 }
 
-export function Step1References({ files, onRemoveFile, onAnalyze }: Props) {
+// ─── Main component ───────────────────────────────────────────────────────────
+
+interface Props {
+  files: ImportedFile[];
+  onAddFiles: (files: FileList) => void;
+  onRemoveFile: (id: string) => void;
+  onAnalyze: () => void;
+  canAnalyze: boolean;
+  isAnalyzing: boolean;
+}
+
+export function Step1References({
+  files,
+  onAddFiles,
+  onRemoveFile,
+  onAnalyze,
+  canAnalyze,
+  isAnalyzing,
+}: Props) {
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       <div>
@@ -64,7 +166,7 @@ export function Step1References({ files, onRemoveFile, onAnalyze }: Props) {
         </p>
       </div>
 
-      <UploadArea />
+      <UploadArea onFilesSelected={onAddFiles} />
 
       {files.length > 0 && (
         <div>
@@ -85,19 +187,17 @@ export function Step1References({ files, onRemoveFile, onAnalyze }: Props) {
 
       <button
         onClick={onAnalyze}
-        disabled={files.length === 0}
+        disabled={!canAnalyze}
         className={[
-          "self-start px-5 py-2 rounded-lg text-sm font-medium transition-colors",
-          files.length > 0
+          "self-start flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors",
+          canAnalyze
             ? "bg-gray-900 text-white hover:bg-gray-800"
             : "bg-gray-100 text-gray-400 cursor-not-allowed",
         ].join(" ")}
       >
+        {isAnalyzing && <Loader2 size={14} className="animate-spin" />}
         开始分析
       </button>
     </div>
   );
 }
-
-// Re-export the placeholder data so the page can initialise state from it.
-export { PLACEHOLDER_REFERENCES as defaultReferences };

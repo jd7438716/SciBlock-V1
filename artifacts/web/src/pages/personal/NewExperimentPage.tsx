@@ -1,30 +1,15 @@
 import React, { useState } from "react";
 import { StepNav } from "./new-experiment/StepNav";
 import { Step1References } from "./new-experiment/steps/Step1References";
+import { useReferences } from "@/hooks/useReferences";
 import { PLACEHOLDER_REFERENCES } from "@/data/experimentReferences";
-import type { ImportedFile } from "@/types/experiment";
 
-/**
- * Rendered inside AuthenticatedLayout — the sidebar is already present.
- * This page owns the wizard layout: step nav on the left, content on the right.
- */
 export function NewExperimentPage() {
   const [activeStepId, setActiveStepId] = useState(1);
-  const [references, setReferences] = useState<ImportedFile[]>(
-    PLACEHOLDER_REFERENCES,
-  );
-
-  function handleRemoveFile(id: string) {
-    setReferences((prev) => prev.filter((f) => f.id !== id));
-  }
-
-  function handleAnalyze() {
-    // TODO: trigger AI analysis when backend is ready
-    console.log("Analyze requested for", references.length, "files");
-  }
+  const refs = useReferences(PLACEHOLDER_REFERENCES);
 
   function handleFinish() {
-    // TODO: navigate to the created SciNote
+    // TODO: navigate to the created SciNote when backend is ready
     console.log("Finish initialization");
   }
 
@@ -33,9 +18,12 @@ export function NewExperimentPage() {
       case 1:
         return (
           <Step1References
-            files={references}
-            onRemoveFile={handleRemoveFile}
-            onAnalyze={handleAnalyze}
+            files={refs.files}
+            onAddFiles={refs.addFiles}
+            onRemoveFile={refs.removeFile}
+            onAnalyze={refs.analyze}
+            canAnalyze={refs.canAnalyze}
+            isAnalyzing={refs.isAnalyzing}
           />
         );
       default:

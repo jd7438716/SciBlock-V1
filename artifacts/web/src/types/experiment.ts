@@ -3,9 +3,13 @@ export interface WizardStep {
   label: string;
 }
 
+export type FileStatus = "pending" | "analyzing" | "done";
+
 export interface ImportedFile {
   id: string;
   name: string;
-  fileType: string; // e.g. "PDF", "DOCX"
-  size: string;     // human-readable, e.g. "2.4 MB"
+  fileType: string;   // e.g. "PDF", "DOCX"
+  size: string;       // human-readable
+  importedAt: string; // display string, e.g. "14:32"
+  status: FileStatus;
 }
