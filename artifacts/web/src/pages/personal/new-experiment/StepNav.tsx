@@ -11,6 +11,8 @@ interface Props {
   onFinish: () => void;
   /** Per-step AI analysis / generation status. Absent key means "idle". */
   aiStatuses?: StepAiStatusMap;
+  /** Label for the finish button. Defaults to "开始记录实验". */
+  finishLabel?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,7 +42,6 @@ function LeftIndicator({
 
 // ---------------------------------------------------------------------------
 // Right AI-state badge — spinner, sparkle, or check
-// Appears at the trailing edge of the step row when status is not idle.
 // ---------------------------------------------------------------------------
 
 function AiBadge({ status }: { status: StepAiStatus | undefined }) {
@@ -75,7 +76,7 @@ function AiBadge({ status }: { status: StepAiStatus | undefined }) {
 }
 
 // ---------------------------------------------------------------------------
-// StepItem — a single step row in the nav
+// StepItem
 // ---------------------------------------------------------------------------
 
 interface StepItemProps {
@@ -104,7 +105,7 @@ function StepItem({ step, active, aiStatus, onClick }: StepItemProps) {
 }
 
 // ---------------------------------------------------------------------------
-// StepNav — the left sidebar wizard navigator
+// StepNav
 // ---------------------------------------------------------------------------
 
 export function StepNav({
@@ -113,6 +114,7 @@ export function StepNav({
   canFinish,
   onFinish,
   aiStatuses,
+  finishLabel = "开始记录实验",
 }: Props) {
   return (
     <div className="flex flex-col h-full">
@@ -140,7 +142,7 @@ export function StepNav({
               : "bg-gray-100 text-gray-400 cursor-not-allowed",
           ].join(" ")}
         >
-          开始记录实验
+          {finishLabel}
         </button>
       </div>
     </div>

@@ -6,11 +6,11 @@ import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
 import { NavLink } from "./NavLink";
 import { SciNoteRow } from "./SciNoteRow";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { NavItem, NavGroup } from "@/config/navigation";
 
 const DRAFT_FALLBACK = "未命名实验";
 
-/** Resolve the detail-page href for a SciNote based on its kind. */
 function sciNoteHref(kind: "placeholder" | "wizard", id: string): string {
   return kind === "wizard"
     ? `/personal/experiment/${id}`
@@ -41,15 +41,18 @@ function GroupHeader({ group }: { group: NavGroup }) {
 // ---------------------------------------------------------------------------
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { notes, renameSciNote } = useSciNoteStore();
   const { draftName } = useNewExperimentDraft();
 
   // Tracks which SciNote (by id) is currently being renamed inline.
   const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
 
+  // Tracks which SciNote is pending confirmation for reinitialization.
+  const [reinitConfirmNoteId, setReinitConfirmNoteId] = useState<string | null>(null);
+
   // ---------------------------------------------------------------------------
-  // More-menu action handlers
+  // Rename handlers
   // ---------------------------------------------------------------------------
 
   function handleRenameRequest(noteId: string) {
@@ -65,10 +68,28 @@ export function AppSidebar() {
     setRenamingNoteId(null);
   }
 
-  function handleReinitialize(noteId: string) {
-    // TODO: navigate back to wizard or open re-init flow
-    console.log("[SciNote] reinitialize:", noteId);
+  // ---------------------------------------------------------------------------
+  // Reinitialize handlers
+  // ---------------------------------------------------------------------------
+
+  function handleReinitRequest(noteId: string) {
+    setReinitConfirmNoteId(noteId);
   }
+
+  function handleReinitConfirm() {
+    if (!reinitConfirmNoteId) return;
+    const targetId = reinitConfirmNoteId;
+    setReinitConfirmNoteId(null);
+    navigate(`/personal/reinitialize/${targetId}`);
+  }
+
+  function handleReinitCancel() {
+    setReinitConfirmNoteId(null);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Delete handler (stub)
+  // ---------------------------------------------------------------------------
 
   function handleDelete(noteId: string) {
     // TODO: show confirm dialog → call store.deleteSciNote(noteId)
@@ -91,6 +112,11 @@ export function AppSidebar() {
   const groups: NavGroup[] = NAV_GROUPS.map((g) =>
     g.title === "个人" ? { ...g, items: draftItem ? [draftItem] : [] } : g,
   );
+
+  // Find the note targeted for reinitialization (for the confirm dialog text).
+  const reinitNote = reinitConfirmNoteId
+    ? notes.find((n) => n.id === reinitConfirmNoteId)
+    : null;
 
   return (
     <aside className="w-52 flex-shrink-0 h-screen bg-white border-r border-gray-100 flex flex-col py-4">
@@ -144,13 +170,13 @@ export function AppSidebar() {
                         handleRenameCommit(note.id, newTitle)
                       }
                       onRenameCancel={handleRenameCancel}
-                      onReinitialize={handleReinitialize}
+                      onReinitialize={handleReinitRequest}
                       onDelete={handleDelete}
                     />
                   );
                 })}
 
-              {/* Other groups (团队, etc.) — static config items */}
+              {/* Other groups (团队, etc.) */}
               {group.title !== "个人" &&
                 group.items.map((item) => (
                   <NavLink
@@ -164,6 +190,22 @@ export function AppSidebar() {
           </div>
         ))}
       </div>
+
+      {/* Reinitialization confirmation dialog */}
+      <ConfirmDialog
+        open={reinitConfirmNoteId !== null}
+        title="重新初始化"
+        description={
+          reinitNote
+            ? `将清空「${reinitNote.title}」的初始化内容，重新填写步骤 1–6。名称将被保留，该 SciNote 不会被删除。`
+            : "将清空当前 SciNote 的初始化内容，但不会删除该 SciNote。确认继续？"
+        }
+        confirmLabel="确认重新初始化"
+        cancelLabel="取消"
+        danger
+        onConfirm={handleReinitConfirm}
+        onCancel={handleReinitCancel}
+      />
     </aside>
   );
 }

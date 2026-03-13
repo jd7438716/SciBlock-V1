@@ -6,17 +6,18 @@ import { PLACEHOLDER_SCINOTES } from "@/data/scinotes";
 
 interface SciNoteStoreContextValue {
   notes: SciNote[];
-  /**
-   * Create a new SciNote from wizard form data.
-   * Returns the id of the newly created note.
-   */
+  /** Create a new SciNote from wizard form data. Returns the new id. */
   createSciNote: (formData: WizardFormData) => string;
   /**
    * Rename an existing SciNote container.
-   * Updating title here propagates everywhere that reads from the store
-   * (sidebar list, TopBar, detail page fallback title).
+   * Only title changes — formData is untouched.
    */
   renameSciNote: (id: string, newTitle: string) => void;
+  /**
+   * Overwrite the formData of an existing SciNote with fresh wizard output.
+   * The note's id, title, kind, and createdAt are all preserved.
+   */
+  reinitializeSciNote: (id: string, newFormData: WizardFormData) => void;
 }
 
 const SciNoteStoreContext = createContext<SciNoteStoreContextValue | null>(null);
@@ -43,8 +44,26 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
     );
   }
 
+  function reinitializeSciNote(id: string, newFormData: WizardFormData) {
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              // Preserve identity fields; replace only the wizard content.
+              formData: newFormData,
+              // Always keep kind as "wizard" after reinit.
+              kind: "wizard",
+            }
+          : n,
+      ),
+    );
+  }
+
   return (
-    <SciNoteStoreContext.Provider value={{ notes, createSciNote, renameSciNote }}>
+    <SciNoteStoreContext.Provider
+      value={{ notes, createSciNote, renameSciNote, reinitializeSciNote }}
+    >
       {children}
     </SciNoteStoreContext.Provider>
   );
