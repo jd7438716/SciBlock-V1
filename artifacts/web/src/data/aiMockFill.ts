@@ -1,159 +1,237 @@
 import type { WizardFormData } from "@/types/wizardForm";
 
 /**
- * Front-end mock data simulating AI extraction from uploaded references.
+ * Front-end mock data simulating AI extraction from uploaded reference files.
  *
- * Step 2 uses the configurable field model:
- *   - "text"   fields for scalar values (实验名称, 实验目标…)
- *   - "object" fields for structured items with attribute tags (研究对象, 实验设备)
+ * ALL steps now use the same "configurable field groups" data model:
+ *   step → fields[] → (type: text | list | object) → objects[] → tags[]
  *
- * Replace with a real AI API response when the backend is ready.
+ * Replace with real AI API response when the backend is ready.
  */
 export const AI_MOCK_FILL: WizardFormData = {
+  // ── Step 2 — 实验系统 ─────────────────────────────────────────────────────
   step2: {
     fields: [
-      // ---- scalar text fields ----
-      {
-        id: "ai-1",
-        name: "实验名称",
-        type: "text",
-        value: "基于纳米粒子的催化性能研究",
-        items: [],
-        objects: [],
-      },
-      {
-        id: "ai-2",
-        name: "实验类型",
-        type: "text",
-        value: "材料性能测试",
-        items: [],
-        objects: [],
-      },
-      {
-        id: "ai-3",
-        name: "实验目标",
-        type: "text",
-        value:
-          "验证功能化纳米粒子在目标催化反应中的转化效率，探究粒径分布与催化活性的定量关联，为后续工艺优化提供基础实验数据。",
-        items: [],
-        objects: [],
-      },
-      {
-        id: "ai-5",
-        name: "研究假设",
-        type: "text",
+      { id: "ai-s2-1", name: "实验名称", type: "text",
+        value: "基于纳米粒子的催化性能研究", items: [], objects: [] },
+      { id: "ai-s2-2", name: "实验类型", type: "text",
+        value: "材料性能测试", items: [], objects: [] },
+      { id: "ai-s2-3", name: "实验目标", type: "text",
+        value: "验证功能化纳米粒子在目标催化反应中的转化效率，探究粒径分布与催化活性的定量关联，为后续工艺优化提供基础实验数据。",
+        items: [], objects: [] },
+      { id: "ai-s2-4", name: "研究假设", type: "text",
         value: "粒径越小的 TiO₂ 纳米粒子因比表面积更大，催化活性越高，底物转化率越高。",
-        items: [],
-        objects: [],
-      },
-
-      // ---- object card fields ----
+        items: [], objects: [] },
       {
-        id: "ai-4",
-        name: "研究对象",
-        type: "object",
-        value: "",
-        items: [],
+        id: "ai-s2-5", name: "研究对象", type: "object", value: "", items: [],
         objects: [
-          {
-            id: "obj-1",
-            name: "TiO₂ 纳米催化剂",
-            tags: [
-              { id: "t-1", key: "粒径", value: "20 nm" },
-              { id: "t-2", key: "用量", value: "50 mg" },
-              { id: "t-3", key: "类型", value: "无机金属氧化物" },
-            ],
-          },
-          {
-            id: "obj-2",
-            name: "底物溶液",
-            tags: [
-              { id: "t-4", key: "浓度", value: "0.1 mol/L" },
-              { id: "t-5", key: "体积", value: "100 mL" },
-            ],
-          },
-          {
-            id: "obj-3",
-            name: "模型目标污染物",
-            tags: [
-              { id: "t-6", key: "类型", value: "有机染料" },
-              { id: "t-7", key: "特征吸收波长", value: "664 nm" },
-            ],
-          },
+          { id: "s2o-1", name: "TiO₂ 纳米催化剂", tags: [
+            { id: "s2t-1", key: "粒径", value: "20 nm" },
+            { id: "s2t-2", key: "用量", value: "50 mg" },
+            { id: "s2t-3", key: "类型", value: "无机金属氧化物" },
+          ]},
+          { id: "s2o-2", name: "底物溶液", tags: [
+            { id: "s2t-4", key: "浓度", value: "0.1 mol/L" },
+            { id: "s2t-5", key: "体积", value: "100 mL" },
+          ]},
+          { id: "s2o-3", name: "模型目标污染物", tags: [
+            { id: "s2t-6", key: "类型", value: "有机染料" },
+            { id: "s2t-7", key: "特征吸收波长", value: "664 nm" },
+          ]},
         ],
       },
       {
-        id: "ai-6",
-        name: "实验设备",
-        type: "object",
-        value: "",
-        items: [],
+        id: "ai-s2-6", name: "实验设备", type: "object", value: "", items: [],
         objects: [
-          {
-            id: "eq-1",
-            name: "UV-Vis 分光光度计",
-            tags: [
-              { id: "t-10", key: "型号", value: "Lambda 950" },
-              { id: "t-11", key: "测量范围", value: "200–800 nm" },
-            ],
-          },
-          {
-            id: "eq-2",
-            name: "超声破碎仪",
-            tags: [
-              { id: "t-12", key: "功率", value: "400 W" },
-              { id: "t-13", key: "频率", value: "20 kHz" },
-            ],
-          },
-          {
-            id: "eq-3",
-            name: "分析天平",
-            tags: [
-              { id: "t-14", key: "精度", value: "0.0001 g" },
-            ],
-          },
+          { id: "s2e-1", name: "UV-Vis 分光光度计", tags: [
+            { id: "s2t-10", key: "型号", value: "Lambda 950" },
+            { id: "s2t-11", key: "测量范围", value: "200–800 nm" },
+          ]},
+          { id: "s2e-2", name: "超声破碎仪", tags: [
+            { id: "s2t-12", key: "功率", value: "400 W" },
+            { id: "s2t-13", key: "频率", value: "20 kHz" },
+          ]},
+          { id: "s2e-3", name: "分析天平", tags: [
+            { id: "s2t-14", key: "精度", value: "0.0001 g" },
+          ]},
         ],
       },
     ],
   },
 
+  // ── Step 3 — 实验准备 ─────────────────────────────────────────────────────
   step3: {
-    materials:
-      "1. TiO₂ 纳米催化剂（粒径 20 nm）50 mg\n" +
-      "2. 底物溶液（浓度 0.1 mol/L）100 mL\n" +
-      "3. 去离子水 200 mL\n" +
-      "4. 分析纯乙醇 50 mL\n" +
-      "5. 氮气（保护气，纯度 ≥ 99.9%）",
-    environment: "恒温 25°C，相对湿度 < 40%，洁净实验室",
-    estimatedTime: "约 2 小时",
+    fields: [
+      {
+        id: "ai-s3-1", name: "准备材料", type: "object", value: "", items: [],
+        objects: [
+          { id: "s3o-1", name: "TiO₂ 纳米催化剂", tags: [
+            { id: "s3t-1", key: "用量", value: "50 mg" },
+            { id: "s3t-2", key: "纯度", value: "≥ 99%" },
+          ]},
+          { id: "s3o-2", name: "底物溶液", tags: [
+            { id: "s3t-3", key: "浓度", value: "0.1 mol/L" },
+            { id: "s3t-4", key: "体积", value: "100 mL" },
+          ]},
+          { id: "s3o-3", name: "去离子水", tags: [
+            { id: "s3t-5", key: "体积", value: "200 mL" },
+          ]},
+          { id: "s3o-4", name: "分析纯乙醇", tags: [
+            { id: "s3t-6", key: "体积", value: "50 mL" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s3-2", name: "准备设备", type: "object", value: "", items: [],
+        objects: [
+          { id: "s3e-1", name: "超声破碎仪", tags: [
+            { id: "s3t-7", key: "功率", value: "400 W" },
+            { id: "s3t-8", key: "预热时间", value: "5 min" },
+          ]},
+          { id: "s3e-2", name: "分析天平", tags: [
+            { id: "s3t-9", key: "精度", value: "0.0001 g" },
+          ]},
+          { id: "s3e-3", name: "磁力搅拌器", tags: [
+            { id: "s3t-10", key: "转速", value: "500 rpm" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s3-3", name: "环境条件", type: "object", value: "", items: [],
+        objects: [
+          { id: "s3c-1", name: "温度", tags: [
+            { id: "s3t-11", key: "设定值", value: "25°C" },
+            { id: "s3t-12", key: "控制精度", value: "±0.5°C" },
+          ]},
+          { id: "s3c-2", name: "相对湿度", tags: [
+            { id: "s3t-13", key: "要求", value: "< 40%" },
+          ]},
+          { id: "s3c-3", name: "洁净环境", tags: [
+            { id: "s3t-14", key: "操作区域", value: "通风橱内" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s3-4", name: "前处理事项", type: "list", value: "", objects: [],
+        items: [
+          "所有玻璃器皿需预先用去离子水清洗三次并烘干",
+          "催化剂称量后立即封存，避免吸潮",
+          "底物溶液现配现用，不超过 2 小时",
+          "确认恒温水浴已提前升温至 25°C",
+        ],
+      },
+    ],
   },
 
+  // ── Step 4 — 实验操作 ─────────────────────────────────────────────────────
   step4: {
-    operationSteps:
-      "1. 称量 50 mg 纳米催化剂，分散于 50 mL 去离子水中\n" +
-      "2. 超声处理 15 min，确保均匀分散，避免团聚\n" +
-      "3. 加入底物溶液，磁力搅拌混合均匀\n" +
-      "4. 在恒温 25°C 搅拌条件下反应 60 min\n" +
-      "5. 每 10 min 取样 1 mL，过滤后备测\n" +
-      "6. 反应结束后离心回收催化剂，洗涤 3 次",
-    cautions:
-      "· 纳米材料须在通风橱内操作，佩戴防护手套及 N95 口罩\n" +
-      "· 超声过程注意控温，防止局部过热导致材料变性\n" +
-      "· 取样时间点须精确记录，误差 ≤ 30 s\n" +
-      "· 离心管使用前检查完整性，防止样品泄漏",
+    fields: [
+      {
+        id: "ai-s4-1", name: "操作步骤", type: "object", value: "", items: [],
+        objects: [
+          { id: "s4o-1", name: "步骤 1：催化剂分散", tags: [
+            { id: "s4t-1", key: "方法", value: "超声破碎" },
+            { id: "s4t-2", key: "时间", value: "15 min" },
+            { id: "s4t-3", key: "溶剂", value: "去离子水 50 mL" },
+          ]},
+          { id: "s4o-2", name: "步骤 2：底物混合", tags: [
+            { id: "s4t-4", key: "操作", value: "加入底物溶液，磁力搅拌" },
+            { id: "s4t-5", key: "时间", value: "5 min" },
+          ]},
+          { id: "s4o-3", name: "步骤 3：催化反应", tags: [
+            { id: "s4t-6", key: "时间", value: "60 min" },
+            { id: "s4t-7", key: "温度", value: "25°C" },
+            { id: "s4t-8", key: "搅拌速度", value: "500 rpm" },
+          ]},
+          { id: "s4o-4", name: "步骤 4：定时取样", tags: [
+            { id: "s4t-9",  key: "频率", value: "每 10 min 一次" },
+            { id: "s4t-10", key: "取样量", value: "1 mL" },
+            { id: "s4t-11", key: "处理", value: "过滤后备测" },
+          ]},
+          { id: "s4o-5", name: "步骤 5：催化剂回收", tags: [
+            { id: "s4t-12", key: "方法", value: "离心" },
+            { id: "s4t-13", key: "洗涤次数", value: "3 次" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s4-2", name: "安全注意事项", type: "list", value: "", objects: [],
+        items: [
+          "纳米材料须在通风橱内操作，佩戴防护手套及 N95 口罩",
+          "超声过程注意控温，防止局部过热导致材料变性",
+          "取样时间点须精确记录，误差 ≤ 30 s",
+          "离心管使用前检查完整性，防止样品泄漏",
+        ],
+      },
+    ],
   },
 
+  // ── Step 5 — 测量过程 ─────────────────────────────────────────────────────
   step5: {
-    metrics: "底物转化率（%）、产物产率（%）、表观反应速率常数 k",
-    method:
-      "通过 UV-Vis 分光光度法在底物特征波长处测定吸光度，结合标准曲线计算浓度及转化率；" +
-      "采用 HPLC 系统确认产物纯度及产率；对各时间点数据进行线性回归求得速率常数 k。",
-    instruments:
-      "UV-Vis 分光光度计（测量范围 200–800 nm）、HPLC 系统、分析天平（精度 0.0001 g）、超声破碎仪",
+    fields: [
+      {
+        id: "ai-s5-1", name: "测量方法", type: "object", value: "", items: [],
+        objects: [
+          { id: "s5o-1", name: "UV-Vis 分光光度法", tags: [
+            { id: "s5t-1", key: "用途", value: "测定底物浓度" },
+            { id: "s5t-2", key: "检测波长", value: "664 nm" },
+          ]},
+          { id: "s5o-2", name: "HPLC 分析", tags: [
+            { id: "s5t-3", key: "用途", value: "确认产物纯度及产率" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s5-2", name: "测量对象", type: "object", value: "", items: [],
+        objects: [
+          { id: "s5m-1", name: "底物转化率", tags: [
+            { id: "s5t-4", key: "单位", value: "%" },
+            { id: "s5t-5", key: "计算方式", value: "标准曲线法" },
+          ]},
+          { id: "s5m-2", name: "产物产率", tags: [
+            { id: "s5t-6", key: "单位", value: "%" },
+          ]},
+          { id: "s5m-3", name: "表观速率常数 k", tags: [
+            { id: "s5t-7", key: "拟合方式", value: "线性回归" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s5-3", name: "测量条件", type: "object", value: "", items: [],
+        objects: [
+          { id: "s5c-1", name: "测量温度", tags: [
+            { id: "s5t-8", key: "值", value: "25°C" },
+          ]},
+          { id: "s5c-2", name: "取样间隔", tags: [
+            { id: "s5t-9",  key: "时间间隔", value: "10 min" },
+            { id: "s5t-10", key: "总次数", value: "6 次" },
+          ]},
+        ],
+      },
+      {
+        id: "ai-s5-4", name: "测量仪器", type: "object", value: "", items: [],
+        objects: [
+          { id: "s5e-1", name: "UV-Vis 分光光度计", tags: [
+            { id: "s5t-11", key: "型号", value: "Lambda 950" },
+            { id: "s5t-12", key: "量程", value: "200–800 nm" },
+          ]},
+          { id: "s5e-2", name: "HPLC 系统", tags: [
+            { id: "s5t-13", key: "用途", value: "产物分析" },
+          ]},
+          { id: "s5e-3", name: "分析天平", tags: [
+            { id: "s5t-14", key: "精度", value: "0.0001 g" },
+          ]},
+        ],
+      },
+    ],
   },
 
+  // ── Step 6 — 实验数据 (AI 只给空类别，用户填写) ─────────────────────────
   step6: {
-    recordingMethod: "",
-    expectedResults: "",
+    fields: [
+      { id: "ai-s6-1", name: "数据项",   type: "object", value: "", items: [], objects: [] },
+      { id: "ai-s6-2", name: "结果指标", type: "object", value: "", items: [], objects: [] },
+      { id: "ai-s6-3", name: "观察记录", type: "list",   value: "", items: [], objects: [] },
+    ],
   },
 };

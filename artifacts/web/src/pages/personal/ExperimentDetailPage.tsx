@@ -1,20 +1,21 @@
 import React from "react";
 import { useParams } from "wouter";
-import { BookOpen, FlaskConical, Package, Wrench, BarChart2, Tag as TagIcon } from "lucide-react";
+import { BookOpen, Tag as TagIcon } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
-import type { WizardFormData } from "@/types/wizardForm";
 import type { ExperimentField, ObjectItem } from "@/types/experimentFields";
 import { getExperimentName } from "@/types/experimentFields";
 
 // ---------------------------------------------------------------------------
-// Object item summary (read-only) — mirrors the ObjectItemCard editing card
+// Read-only ObjectItem card (mirrors ObjectItemCard's visual style)
 // ---------------------------------------------------------------------------
 
 function ObjectItemSummary({ item }: { item: ObjectItem }) {
   return (
     <div className="bg-white rounded-lg border border-gray-100 px-4 pt-3 pb-3 flex flex-col gap-2">
-      <p className="text-base font-semibold text-gray-800 leading-tight">{item.name || "—"}</p>
+      <p className="text-base font-semibold text-gray-800 leading-tight">
+        {item.name || "—"}
+      </p>
       {item.tags.length > 0 && (
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-1 text-xs text-gray-400">
@@ -38,7 +39,7 @@ function ObjectItemSummary({ item }: { item: ObjectItem }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 field rendering — mirrors the FieldEditor + FieldCard structure
+// Read-only FieldSummaryCard (mirrors FieldCard's structure)
 // ---------------------------------------------------------------------------
 
 function FieldSummaryCard({ field }: { field: ExperimentField }) {
@@ -54,11 +55,12 @@ function FieldSummaryCard({ field }: { field: ExperimentField }) {
       <p className="text-xs font-semibold text-gray-400 tracking-wide uppercase mb-3">
         {field.name}
       </p>
-
       {isEmpty ? (
         <p className="text-sm text-gray-300 italic">未填写</p>
       ) : field.type === "text" ? (
-        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{field.value}</p>
+        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+          {field.value}
+        </p>
       ) : field.type === "list" ? (
         <ul className="flex flex-col gap-1">
           {field.items.map((item, i) => (
@@ -69,7 +71,6 @@ function FieldSummaryCard({ field }: { field: ExperimentField }) {
           ))}
         </ul>
       ) : (
-        /* object */
         <div className="flex flex-col gap-2">
           {field.objects.map((obj) => (
             <ObjectItemSummary key={obj.id} item={obj} />
@@ -80,63 +81,33 @@ function FieldSummaryCard({ field }: { field: ExperimentField }) {
   );
 }
 
-function Step2Summary({ fields }: { fields: ExperimentField[] }) {
-  if (fields.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-3">
-      {fields.map((f) => (
-        <FieldSummaryCard key={f.id} field={f} />
-      ))}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Steps 3–5 simple info cards
+// Step section — renders a titled group of fields, hidden if all empty
 // ---------------------------------------------------------------------------
 
-interface InfoCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
+interface StepSectionProps {
+  title: string;
+  fields: ExperimentField[];
 }
 
-function InfoCard({ icon, label, value }: InfoCardProps) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 px-5 py-4">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-gray-400">{icon}</span>
-        <span className="text-xs font-semibold text-gray-400 tracking-wide uppercase">{label}</span>
-      </div>
-      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-        {value || <span className="text-gray-300 italic">未填写</span>}
-      </p>
-    </div>
+function StepSection({ title, fields }: StepSectionProps) {
+  const hasContent = fields.some(
+    (f) =>
+      (f.type === "text" && f.value.trim()) ||
+      (f.type === "list" && f.items.length > 0) ||
+      (f.type === "object" && f.objects.length > 0),
   );
-}
+  if (!hasContent) return null;
 
-function Steps35Summary({ data }: { data: WizardFormData }) {
-  const { step3, step4, step5 } = data;
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4">
-        <InfoCard icon={<Package size={14} />} label="所需材料" value={step3.materials} />
-        <InfoCard
-          icon={<FlaskConical size={14} />}
-          label="实验环境 / 估计时长"
-          value={[step3.environment, step3.estimatedTime].filter(Boolean).join(" · ")}
-        />
+    <section>
+      <h2 className="text-sm font-semibold text-gray-500 mb-3">{title}</h2>
+      <div className="flex flex-col gap-3">
+        {fields.map((f) => (
+          <FieldSummaryCard key={f.id} field={f} />
+        ))}
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <InfoCard icon={<Wrench size={14} />} label="操作步骤" value={step4.operationSteps} />
-        <InfoCard icon={<Wrench size={14} />} label="注意事项" value={step4.cautions} />
-      </div>
-      <InfoCard
-        icon={<BarChart2 size={14} />}
-        label="测量指标 · 方法 · 仪器"
-        value={[step5.metrics, step5.method, step5.instruments].filter(Boolean).join("\n")}
-      />
-    </div>
+    </section>
   );
 }
 
@@ -160,7 +131,8 @@ export function ExperimentDetailPage() {
     );
   }
 
-  const expType = note.formData?.step2.fields.find((f) => f.name === "实验类型")?.value;
+  const fd = note.formData;
+  const expType = fd?.step2.fields.find((f) => f.name === "实验类型")?.value;
 
   return (
     <AppLayout title={note.title}>
@@ -169,7 +141,7 @@ export function ExperimentDetailPage() {
         {/* Header */}
         <div className="flex flex-col gap-1">
           <h1 className="text-xl font-semibold text-gray-900">
-            {getExperimentName(note.formData?.step2.fields ?? []) || note.title}
+            {getExperimentName(fd?.step2.fields ?? []) || note.title}
           </h1>
           {expType && <p className="text-sm text-gray-400">{expType}</p>}
           {note.createdAt && (
@@ -179,23 +151,18 @@ export function ExperimentDetailPage() {
           )}
         </div>
 
-        {/* Step 2 — 实验系统 (dynamic fields) */}
-        {note.formData && note.formData.step2.fields.length > 0 && (
-          <section>
-            <h2 className="text-sm font-semibold text-gray-500 mb-3">实验系统</h2>
-            <Step2Summary fields={note.formData.step2.fields} />
-          </section>
+        {/* Steps 2–6 — unified field-based rendering */}
+        {fd && (
+          <>
+            <StepSection title="实验系统" fields={fd.step2.fields} />
+            <StepSection title="实验准备" fields={fd.step3.fields} />
+            <StepSection title="实验操作" fields={fd.step4.fields} />
+            <StepSection title="测量过程" fields={fd.step5.fields} />
+            <StepSection title="实验数据" fields={fd.step6.fields} />
+          </>
         )}
 
-        {/* Steps 3–5 */}
-        {note.formData && (
-          <section>
-            <h2 className="text-sm font-semibold text-gray-500 mb-3">实验详情</h2>
-            <Steps35Summary data={note.formData} />
-          </section>
-        )}
-
-        {!note.formData && (
+        {!fd && (
           <div className="bg-white rounded-xl border border-gray-100 px-5 py-4 text-sm text-gray-400">
             该记录未包含初始化表单数据。
           </div>

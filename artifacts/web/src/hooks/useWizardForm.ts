@@ -1,14 +1,20 @@
 import { useState } from "react";
 import type { WizardFormData } from "@/types/wizardForm";
 import { getExperimentName } from "@/types/experimentFields";
-import { DEFAULT_STEP2_FIELDS } from "@/data/defaultStep2Fields";
+import {
+  DEFAULT_STEP2_FIELDS,
+  DEFAULT_STEP3_FIELDS,
+  DEFAULT_STEP4_FIELDS,
+  DEFAULT_STEP5_FIELDS,
+  DEFAULT_STEP6_FIELDS,
+} from "@/data/defaultStepFields";
 
 const INITIAL: WizardFormData = {
   step2: { fields: DEFAULT_STEP2_FIELDS },
-  step3: { materials: "", environment: "", estimatedTime: "" },
-  step4: { operationSteps: "", cautions: "" },
-  step5: { metrics: "", method: "", instruments: "" },
-  step6: { recordingMethod: "", expectedResults: "" },
+  step3: { fields: DEFAULT_STEP3_FIELDS },
+  step4: { fields: DEFAULT_STEP4_FIELDS },
+  step5: { fields: DEFAULT_STEP5_FIELDS },
+  step6: { fields: DEFAULT_STEP6_FIELDS },
 };
 
 export interface UseWizardFormResult {
