@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { WizardFormData } from "@/types/wizardForm";
+import { getExperimentName } from "@/types/experimentFields";
+import { DEFAULT_STEP2_FIELDS } from "@/data/defaultStep2Fields";
 
 const INITIAL: WizardFormData = {
-  step2: { experimentName: "", experimentType: "", goal: "" },
+  step2: { fields: DEFAULT_STEP2_FIELDS },
   step3: { materials: "", environment: "", estimatedTime: "" },
   step4: { operationSteps: "", cautions: "" },
   step5: { metrics: "", method: "", instruments: "" },
@@ -13,13 +15,13 @@ export interface UseWizardFormResult {
   data: WizardFormData;
   /**
    * Update one or more fields in a step.
-   * Usage: patch('step2', { experimentName: 'foo' })
+   * Usage: patch('step2', { fields: updatedFields })
    */
   patch: <K extends keyof WizardFormData>(
     step: K,
     updates: Partial<WizardFormData[K]>,
   ) => void;
-  /** True when the minimum required fields are filled */
+  /** True when the minimum required fields are filled (实验名称 must be non-empty) */
   canFinish: boolean;
   /** True after AI mock data has been injected via populateFromAI */
   isAiFilled: boolean;
@@ -46,8 +48,8 @@ export function useWizardForm(): UseWizardFormResult {
     setIsAiFilled(true);
   }
 
-  // Minimum condition: experiment name is filled (step 2).
-  const canFinish = data.step2.experimentName.trim().length > 0;
+  // Minimum condition: 实验名称 field must have a non-empty value.
+  const canFinish = getExperimentName(data.step2.fields).length > 0;
 
   return { data, patch, canFinish, isAiFilled, populateFromAI };
 }

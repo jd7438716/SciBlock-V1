@@ -1,7 +1,12 @@
+import type { ExperimentField } from "./experimentFields";
+
+/**
+ * Step 2 — 实验系统
+ * Configurable field group: the user can add, delete, and edit field categories.
+ * AI extraction is also converted into this structure so the user can refine it.
+ */
 export interface Step2Data {
-  experimentName: string;  // required — drives canFinish
-  experimentType: string;
-  goal: string;
+  fields: ExperimentField[];
 }
 
 export interface Step3Data {

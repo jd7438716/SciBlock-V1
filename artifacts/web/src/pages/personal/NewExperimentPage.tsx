@@ -13,6 +13,7 @@ import { useReferences } from "@/hooks/useReferences";
 import { useWizardForm } from "@/hooks/useWizardForm";
 import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
+import { getExperimentName } from "@/types/experimentFields";
 import { AI_MOCK_FILL } from "@/data/aiMockFill";
 
 const TOTAL_STEPS = 6;
@@ -39,10 +40,12 @@ export function NewExperimentPage() {
   const { setDraftName } = useNewExperimentDraft();
 
   // Publish experiment name to sidebar in real time.
+  // Derived from the "实验名称" field in the configurable field list.
   // Empty string is fine — the sidebar renders "未命名实验" as a fallback.
+  const experimentName = getExperimentName(form.data.step2.fields);
   useEffect(() => {
-    setDraftName(form.data.step2.experimentName);
-  }, [form.data.step2.experimentName]); // eslint-disable-line react-hooks/exhaustive-deps
+    setDraftName(experimentName);
+  }, [experimentName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Remove the sidebar draft entry when leaving the page.
   useEffect(() => {

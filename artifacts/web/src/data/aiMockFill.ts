@@ -2,13 +2,51 @@ import type { WizardFormData } from "@/types/wizardForm";
 
 /**
  * Front-end mock data that simulates an AI extraction from uploaded references.
- * Replace this with a real API response when the AI backend is ready.
+ * Step 2 fields are structured as ExperimentField[] so the user can add/remove/edit
+ * individual field categories after the AI provides an initial draft.
+ *
+ * Replace this with a real AI API response when the backend is ready.
  */
 export const AI_MOCK_FILL: WizardFormData = {
   step2: {
-    experimentName: "基于纳米粒子的催化性能研究",
-    experimentType: "材料性能测试",
-    goal: "验证功能化纳米粒子在目标催化反应中的转化效率，探究粒径分布与催化活性的定量关联，为后续工艺优化提供基础实验数据。",
+    fields: [
+      {
+        id: "ai-1",
+        name: "实验名称",
+        type: "text",
+        value: "基于纳米粒子的催化性能研究",
+        items: [],
+      },
+      {
+        id: "ai-2",
+        name: "实验类型",
+        type: "text",
+        value: "材料性能测试",
+        items: [],
+      },
+      {
+        id: "ai-3",
+        name: "实验目标",
+        type: "text",
+        value:
+          "验证功能化纳米粒子在目标催化反应中的转化效率，探究粒径分布与催化活性的定量关联，为后续工艺优化提供基础实验数据。",
+        items: [],
+      },
+      {
+        id: "ai-4",
+        name: "研究对象",
+        type: "list",
+        value: "",
+        items: ["TiO₂ 纳米催化剂（粒径 20 nm）", "底物溶液（浓度 0.1 mol/L）", "模型目标污染物"],
+      },
+      {
+        id: "ai-5",
+        name: "研究假设",
+        type: "text",
+        value: "粒径越小的 TiO₂ 纳米粒子因比表面积更大，催化活性越高，底物转化率越高。",
+        items: [],
+      },
+    ],
   },
 
   step3: {

@@ -1,12 +1,64 @@
 import React from "react";
 import { useParams } from "wouter";
-import { BookOpen, FlaskConical, Target, Package, Wrench, BarChart2 } from "lucide-react";
+import { BookOpen, FlaskConical, Package, Wrench, BarChart2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import type { WizardFormData } from "@/types/wizardForm";
+import type { ExperimentField } from "@/types/experimentFields";
+import { getExperimentName } from "@/types/experimentFields";
 
 // ---------------------------------------------------------------------------
-// Sub-components
+// Step 2 field rendering — mirrors the configurable field groups from the wizard
+// ---------------------------------------------------------------------------
+
+function FieldSummaryCard({ field }: { field: ExperimentField }) {
+  const isEmpty =
+    field.type === "text"
+      ? !field.value.trim()
+      : field.items.length === 0;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 px-5 py-4">
+      <p className="text-xs font-semibold text-gray-400 tracking-wide uppercase mb-2">
+        {field.name}
+      </p>
+      {isEmpty ? (
+        <p className="text-sm text-gray-300 italic">未填写</p>
+      ) : field.type === "text" ? (
+        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+          {field.value}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {field.items.map((item, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0 mt-1.5" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+interface Step2SummaryProps {
+  fields: ExperimentField[];
+}
+
+function Step2Summary({ fields }: Step2SummaryProps) {
+  if (fields.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {fields.map((f) => (
+        <FieldSummaryCard key={f.id} field={f} />
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Steps 3–5 simple info cards
 // ---------------------------------------------------------------------------
 
 interface InfoCardProps {
@@ -31,52 +83,22 @@ function InfoCard({ icon, label, value }: InfoCardProps) {
   );
 }
 
-interface SummaryProps {
-  data: WizardFormData;
-}
-
-function ExperimentSummary({ data }: SummaryProps) {
-  const { step2, step3, step4, step5 } = data;
+function Steps35Summary({ data }: { data: WizardFormData }) {
+  const { step3, step4, step5 } = data;
   return (
     <div className="flex flex-col gap-4">
-      {/* Row 1: goal spans full width */}
-      {step2.goal && (
-        <InfoCard
-          icon={<Target size={14} />}
-          label="实验目标"
-          value={step2.goal}
-        />
-      )}
-
-      {/* Row 2: materials + environment */}
       <div className="grid grid-cols-2 gap-4">
-        <InfoCard
-          icon={<Package size={14} />}
-          label="所需材料"
-          value={step3.materials}
-        />
+        <InfoCard icon={<Package size={14} />} label="所需材料" value={step3.materials} />
         <InfoCard
           icon={<FlaskConical size={14} />}
           label="实验环境 / 估计时长"
           value={[step3.environment, step3.estimatedTime].filter(Boolean).join(" · ")}
         />
       </div>
-
-      {/* Row 3: operations + cautions */}
       <div className="grid grid-cols-2 gap-4">
-        <InfoCard
-          icon={<Wrench size={14} />}
-          label="操作步骤"
-          value={step4.operationSteps}
-        />
-        <InfoCard
-          icon={<Wrench size={14} />}
-          label="注意事项"
-          value={step4.cautions}
-        />
+        <InfoCard icon={<Wrench size={14} />} label="操作步骤" value={step4.operationSteps} />
+        <InfoCard icon={<Wrench size={14} />} label="注意事项" value={step4.cautions} />
       </div>
-
-      {/* Row 4: metrics + method + instruments */}
       <InfoCard
         icon={<BarChart2 size={14} />}
         label="测量指标 · 方法 · 仪器"
@@ -106,16 +128,18 @@ export function ExperimentDetailPage() {
     );
   }
 
+  const expType = note.formData?.step2.fields.find((f) => f.name === "实验类型")?.value;
+
   return (
     <AppLayout title={note.title}>
       <div className="max-w-3xl mx-auto flex flex-col gap-8">
 
-        {/* Experiment meta header */}
+        {/* Header */}
         <div className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-gray-900">{note.title}</h1>
-          {note.formData?.step2.experimentType && (
-            <p className="text-sm text-gray-400">{note.formData.step2.experimentType}</p>
-          )}
+          <h1 className="text-xl font-semibold text-gray-900">
+            {getExperimentName(note.formData?.step2.fields ?? []) || note.title}
+          </h1>
+          {expType && <p className="text-sm text-gray-400">{expType}</p>}
           {note.createdAt && (
             <p className="text-xs text-gray-300">
               创建于 {new Date(note.createdAt).toLocaleString("zh-CN")}
@@ -123,13 +147,23 @@ export function ExperimentDetailPage() {
           )}
         </div>
 
-        {/* Summary info from initialization */}
-        {note.formData ? (
+        {/* Step 2 — 实验系统 (dynamic field list) */}
+        {note.formData && note.formData.step2.fields.length > 0 && (
           <section>
-            <h2 className="text-sm font-semibold text-gray-500 mb-3">实验基础信息</h2>
-            <ExperimentSummary data={note.formData} />
+            <h2 className="text-sm font-semibold text-gray-500 mb-3">实验系统</h2>
+            <Step2Summary fields={note.formData.step2.fields} />
           </section>
-        ) : (
+        )}
+
+        {/* Steps 3–5 */}
+        {note.formData && (
+          <section>
+            <h2 className="text-sm font-semibold text-gray-500 mb-3">实验详情</h2>
+            <Steps35Summary data={note.formData} />
+          </section>
+        )}
+
+        {!note.formData && (
           <div className="bg-white rounded-xl border border-gray-100 px-5 py-4 text-sm text-gray-400">
             该记录未包含初始化表单数据。
           </div>

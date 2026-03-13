@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import type { SciNote } from "@/types/scinote";
 import type { WizardFormData } from "@/types/wizardForm";
+import { getExperimentName } from "@/types/experimentFields";
 import { PLACEHOLDER_SCINOTES } from "@/data/scinotes";
 
 interface SciNoteStoreContextValue {
@@ -21,7 +22,7 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
     const id = `exp-${Date.now()}`;
     const newNote: SciNote = {
       id,
-      title: formData.step2.experimentName.trim() || "未命名实验",
+      title: getExperimentName(formData.step2.fields) || "未命名实验",
       kind: "wizard",
       createdAt: new Date().toISOString(),
       formData,
