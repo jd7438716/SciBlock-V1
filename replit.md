@@ -9,9 +9,55 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ### `artifacts/web` (`@workspace/web`)
 
 React + Vite frontend. Routes:
-- `/login` — SciBlock login page (LoginPage, AuthCard, InputField, CheckboxField, AuthButton)
-- `/home` — Home page (post-login)
+- `/login` — SciBlock login page
+- `/home` — Home page (post-login, sidebar layout)
+- `/signup` — "Access by Invitation" page (no public registration)
 - `/` — redirects to `/login`
+
+#### Frontend source structure (`artifacts/web/src/`)
+
+```
+src/
+├── types/                  # Shared TypeScript interfaces
+│   ├── auth.ts             # User, LoginRequest, LoginResponse
+│   └── note.ts             # Note
+├── api/                    # All HTTP calls (one file per domain)
+│   ├── client.ts           # apiFetch() base wrapper + ApiError class
+│   └── auth.ts             # login()
+├── hooks/                  # Business logic hooks (no UI)
+│   └── useLogin.ts         # Login form state, validation, submission
+├── config/                 # App configuration data (no components)
+│   └── navigation.ts       # NavItem / NavGroup types + TOP_NAV / NAV_GROUPS arrays
+├── components/
+│   ├── layout/
+│   │   ├── AppLayout.tsx   # Authenticated page shell (sidebar + topbar + main)
+│   │   └── TopBar.tsx      # Top header bar component
+│   └── ui/                 # shadcn/ui primitives
+└── pages/
+    ├── login/
+    │   ├── LoginPage.tsx    # Page shell
+    │   ├── AuthCard.tsx     # Form — uses useLogin hook
+    │   ├── InputField.tsx   # Controlled input with label + error
+    │   ├── CheckboxField.tsx
+    │   └── AuthButton.tsx
+    ├── home/
+    │   ├── AppSidebar.tsx   # Sidebar — reads from config/navigation.ts
+    │   ├── NavLink.tsx      # Single nav link (active state)
+    │   ├── QueryBox.tsx     # AI text input card
+    │   ├── NoteCard.tsx     # Single note card
+    │   └── RecentNotes.tsx  # Recent notes section (list of NoteCard)
+    ├── HomePage.tsx         # Composes AppLayout + QueryBox + RecentNotes
+    ├── RequestAccessPage.tsx
+    └── not-found.tsx
+```
+
+**Conventions:**
+- Pages compose layout + feature components only; no raw fetch/state logic inside pages
+- `api/` modules are pure async functions; they throw `ApiError` on non-2xx
+- Hooks own form/business state and call `api/` functions
+- `config/navigation.ts` is pure data — no JSX; sidebar reads it at render time
+- New nav items: add to `NAV_GROUPS` in `config/navigation.ts` only
+- New API endpoints: add a function in the matching `api/` file
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 
