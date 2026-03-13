@@ -2,32 +2,51 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthenticatedLayout } from "@/components/layout/AuthenticatedLayout";
 import NotFound from "@/pages/not-found";
 import { LoginPage } from "@/pages/login/LoginPage";
-import { HomePage } from "@/pages/HomePage";
 import { RequestAccessPage } from "@/pages/RequestAccessPage";
+import { HomePage } from "@/pages/HomePage";
 import { NewExperimentPage } from "@/pages/personal/NewExperimentPage";
 import { SciNoteDetailPage } from "@/pages/personal/SciNoteDetailPage";
 
 const queryClient = new QueryClient();
 
+/**
+ * Routes that share the authenticated app shell (sidebar always visible).
+ * Add every post-login route here.
+ */
+function AuthenticatedRouter() {
+  return (
+    <AuthenticatedLayout>
+      <Switch>
+        <Route path="/home" component={HomePage} />
+        <Route path="/personal/new-experiment" component={NewExperimentPage} />
+        <Route path="/personal/note/:id" component={SciNoteDetailPage} />
+        <Route path="/">
+          {() => {
+            window.location.replace(
+              import.meta.env.BASE_URL.replace(/\/$/, "") + "/login"
+            );
+            return null;
+          }}
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </AuthenticatedLayout>
+  );
+}
+
 function Router() {
   return (
     <Switch>
+      {/* Public routes — no sidebar */}
       <Route path="/login" component={LoginPage} />
-      <Route path="/home" component={HomePage} />
       <Route path="/signup" component={RequestAccessPage} />
-      <Route path="/personal/new-experiment" component={NewExperimentPage} />
-      <Route path="/personal/note/:id" component={SciNoteDetailPage} />
-      <Route path="/">
-        {() => {
-          window.location.replace(
-            import.meta.env.BASE_URL.replace(/\/$/, "") + "/login"
-          );
-          return null;
-        }}
+      {/* All other routes get the authenticated shell */}
+      <Route>
+        <AuthenticatedRouter />
       </Route>
-      <Route component={NotFound} />
     </Switch>
   );
 }
