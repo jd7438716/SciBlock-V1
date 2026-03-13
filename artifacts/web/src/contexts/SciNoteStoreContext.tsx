@@ -11,6 +11,12 @@ interface SciNoteStoreContextValue {
    * Returns the id of the newly created note.
    */
   createSciNote: (formData: WizardFormData) => string;
+  /**
+   * Rename an existing SciNote container.
+   * Updating title here propagates everywhere that reads from the store
+   * (sidebar list, TopBar, detail page fallback title).
+   */
+  renameSciNote: (id: string, newTitle: string) => void;
 }
 
 const SciNoteStoreContext = createContext<SciNoteStoreContextValue | null>(null);
@@ -31,8 +37,14 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
     return id;
   }
 
+  function renameSciNote(id: string, newTitle: string) {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, title: newTitle } : n)),
+    );
+  }
+
   return (
-    <SciNoteStoreContext.Provider value={{ notes, createSciNote }}>
+    <SciNoteStoreContext.Provider value={{ notes, createSciNote, renameSciNote }}>
       {children}
     </SciNoteStoreContext.Provider>
   );

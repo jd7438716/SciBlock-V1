@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { LayoutGrid, Plus, BookOpen } from "lucide-react";
 import { TOP_NAV, NAV_GROUPS } from "@/config/navigation";
@@ -37,34 +37,48 @@ function GroupHeader({ group }: { group: NavGroup }) {
 }
 
 // ---------------------------------------------------------------------------
-// More-menu action handlers (front-end stubs — no backend yet)
-// ---------------------------------------------------------------------------
-
-function handleRename(noteId: string) {
-  // TODO: open rename dialog or inline input
-  console.log("[SciNote] rename:", noteId);
-}
-
-function handleReinitialize(noteId: string) {
-  // TODO: navigate back to wizard or open re-init flow
-  console.log("[SciNote] reinitialize:", noteId);
-}
-
-function handleDelete(noteId: string) {
-  // TODO: show confirm dialog → call store.deleteSciNote(noteId)
-  console.log("[SciNote] delete:", noteId);
-}
-
-// ---------------------------------------------------------------------------
 // Sidebar
 // ---------------------------------------------------------------------------
 
 export function AppSidebar() {
   const [location] = useLocation();
-  const { notes } = useSciNoteStore();
+  const { notes, renameSciNote } = useSciNoteStore();
   const { draftName } = useNewExperimentDraft();
 
-  // The in-progress experiment initialization — shown at the top of 个人 when active.
+  // Tracks which SciNote (by id) is currently being renamed inline.
+  const [renamingNoteId, setRenamingNoteId] = useState<string | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // More-menu action handlers
+  // ---------------------------------------------------------------------------
+
+  function handleRenameRequest(noteId: string) {
+    setRenamingNoteId(noteId);
+  }
+
+  function handleRenameCommit(noteId: string, newTitle: string) {
+    renameSciNote(noteId, newTitle);
+    setRenamingNoteId(null);
+  }
+
+  function handleRenameCancel() {
+    setRenamingNoteId(null);
+  }
+
+  function handleReinitialize(noteId: string) {
+    // TODO: navigate back to wizard or open re-init flow
+    console.log("[SciNote] reinitialize:", noteId);
+  }
+
+  function handleDelete(noteId: string) {
+    // TODO: show confirm dialog → call store.deleteSciNote(noteId)
+    console.log("[SciNote] delete:", noteId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build nav groups with dynamic 个人 items
+  // ---------------------------------------------------------------------------
+
   const draftItem: NavItem | null =
     draftName !== null
       ? {
@@ -74,7 +88,6 @@ export function AppSidebar() {
         }
       : null;
 
-  // Merge static config with dynamic items for the "个人" group.
   const groups: NavGroup[] = NAV_GROUPS.map((g) =>
     g.title === "个人" ? { ...g, items: draftItem ? [draftItem] : [] } : g,
   );
@@ -91,7 +104,7 @@ export function AppSidebar() {
         </span>
       </div>
 
-      {/* Top-level flat nav (主页, 消息) */}
+      {/* Top-level flat nav */}
       <nav className="px-2 flex flex-col gap-0.5">
         {TOP_NAV.map((item) => (
           <NavLink key={item.href} item={item} active={location === item.href} />
@@ -104,7 +117,8 @@ export function AppSidebar() {
           <div key={group.title}>
             <GroupHeader group={group} />
             <div className="flex flex-col gap-0.5">
-              {/* Draft entry (no more-menu) */}
+
+              {/* Draft entry (no more-menu — wizard still in progress) */}
               {group.title === "个人" && draftItem && (
                 <NavLink
                   key={draftItem.href}
@@ -113,22 +127,30 @@ export function AppSidebar() {
                 />
               )}
 
-              {/* Saved SciNotes (with more-menu) */}
+              {/* Saved SciNotes — with inline rename + more-menu */}
               {group.title === "个人" &&
-                notes.map((note) => (
-                  <SciNoteRow
-                    key={note.id}
-                    noteId={note.id}
-                    title={note.title}
-                    href={sciNoteHref(note.kind, note.id)}
-                    active={location === sciNoteHref(note.kind, note.id)}
-                    onRename={handleRename}
-                    onReinitialize={handleReinitialize}
-                    onDelete={handleDelete}
-                  />
-                ))}
+                notes.map((note) => {
+                  const href = sciNoteHref(note.kind, note.id);
+                  return (
+                    <SciNoteRow
+                      key={note.id}
+                      noteId={note.id}
+                      title={note.title}
+                      href={href}
+                      active={location === href}
+                      isRenaming={renamingNoteId === note.id}
+                      onRenameRequest={handleRenameRequest}
+                      onRenameCommit={(newTitle) =>
+                        handleRenameCommit(note.id, newTitle)
+                      }
+                      onRenameCancel={handleRenameCancel}
+                      onReinitialize={handleReinitialize}
+                      onDelete={handleDelete}
+                    />
+                  );
+                })}
 
-              {/* Other group items (团队, etc.) */}
+              {/* Other groups (团队, etc.) — static config items */}
               {group.title !== "个人" &&
                 group.items.map((item) => (
                   <NavLink
@@ -137,6 +159,7 @@ export function AppSidebar() {
                     active={location === item.href}
                   />
                 ))}
+
             </div>
           </div>
         ))}
