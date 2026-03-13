@@ -10,49 +10,62 @@ interface Props {
 /**
  * OntologyModuleEditor — displays and edits a single ontology module.
  *
- * States:
- *   inherited → shows content in read-only view, edit button visible
- *   editing   → shows textarea for editing
- *   confirmed → shows content in read-only view, confirmed badge
+ * State machine (one-way except edit → inherited on cancel):
+ *   inherited → confirmed  (直接确认继承内容，无需编辑)
+ *   inherited → editing    (先编辑再确认)
+ *   editing   → confirmed  (保存编辑内容并确认)
+ *   editing   → inherited  (取消，内容恢复)
+ *   confirmed → editing    (再次编辑，状态回到 editing)
  *
- * Highlight: when isHighlighted=true, the card gets a faint amber ring
- * to indicate it was flagged as relevant by the AI title assist.
+ * Highlight: isHighlighted=true → faint amber ring (AI flagged this module)
  */
 export function OntologyModuleEditor({ module }: Props) {
   const { updateModuleContent, setModuleStatus } = useWorkbench();
 
   const [draft, setDraft] = useState(module.content);
 
-  // Sync draft if the module content changes externally (e.g. new record)
+  // Sync draft when switching to a different module or record
   useEffect(() => {
     setDraft(module.content);
   }, [module.key, module.content]);
+
+  const isEditing   = module.status === "editing";
+  const isConfirmed = module.status === "confirmed";
+  const isInherited = module.status === "inherited";
 
   function handleEditClick() {
     setModuleStatus(module.key, "editing");
   }
 
-  function handleConfirm() {
+  function handleEditConfirm() {
     updateModuleContent(module.key, draft);
+    setModuleStatus(module.key, "confirmed");
+  }
+
+  function handleDirectConfirm() {
+    // Confirm the inherited content without modification
     setModuleStatus(module.key, "confirmed");
   }
 
   function handleCancelEdit() {
     setDraft(module.content);
-    setModuleStatus(module.key, module.content ? "inherited" : "inherited");
+    setModuleStatus(module.key, "inherited");
   }
 
-  const isEditing = module.status === "editing";
-  const isConfirmed = module.status === "confirmed";
+  function handleReEdit() {
+    setModuleStatus(module.key, "editing");
+  }
 
   return (
     <div
       className={[
         "flex flex-col h-full",
-        module.isHighlighted ? "ring-2 ring-amber-300 ring-inset rounded-none" : "",
+        module.isHighlighted ? "ring-2 ring-amber-300 ring-inset" : "",
       ].join(" ")}
     >
-      {/* Module header */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Header                                                              */}
+      {/* ------------------------------------------------------------------ */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-white flex-shrink-0">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-gray-800">{module.title}</h3>
@@ -63,14 +76,25 @@ export function OntologyModuleEditor({ module }: Props) {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          {isConfirmed ? (
-            <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-              <CheckCircle2 size={13} />
-              已确认
-            </span>
-          ) : isEditing ? (
-            <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
+          {isConfirmed && (
+            <>
+              <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <CheckCircle2 size={13} />
+                已确认
+              </span>
+              <button
+                onClick={handleReEdit}
+                className="text-xs text-gray-300 hover:text-gray-600 transition-colors ml-1"
+                title="重新编辑"
+              >
+                <Pencil size={11} />
+              </button>
+            </>
+          )}
+
+          {isEditing && (
+            <>
               <button
                 onClick={handleCancelEdit}
                 className="text-xs text-gray-400 hover:text-gray-600 transition-colors px-1.5 py-0.5 rounded"
@@ -78,30 +102,44 @@ export function OntologyModuleEditor({ module }: Props) {
                 取消
               </button>
               <button
-                onClick={handleConfirm}
+                onClick={handleEditConfirm}
                 className="text-xs bg-gray-900 text-white px-2.5 py-1 rounded hover:bg-gray-700 transition-colors font-medium"
               >
                 确认
               </button>
-            </div>
-          ) : (
-            <button
-              onClick={handleEditClick}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              <Pencil size={12} />
-              编辑
-            </button>
+            </>
+          )}
+
+          {isInherited && (
+            <>
+              <button
+                onClick={handleEditClick}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors"
+              >
+                <Pencil size={12} />
+                编辑
+              </button>
+              <button
+                onClick={handleDirectConfirm}
+                className="text-xs border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-800 px-2 py-0.5 rounded transition-colors"
+              >
+                确认
+              </button>
+            </>
           )}
         </div>
       </div>
 
-      {/* Content area */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Content                                                             */}
+      {/* ------------------------------------------------------------------ */}
       <div className="flex-1 overflow-y-auto">
         {isEditing ? (
           <textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+            }}
             className="w-full h-full min-h-[200px] px-4 py-3 text-sm text-gray-700 leading-relaxed resize-none outline-none bg-amber-50 border-0 font-mono"
             placeholder="输入模块内容…"
             autoFocus
@@ -120,8 +158,10 @@ export function OntologyModuleEditor({ module }: Props) {
         )}
       </div>
 
-      {/* Inherited badge */}
-      {module.status === "inherited" && (
+      {/* ------------------------------------------------------------------ */}
+      {/* Footer badge                                                        */}
+      {/* ------------------------------------------------------------------ */}
+      {isInherited && (
         <div className="px-4 py-1.5 border-t border-gray-100 bg-white flex-shrink-0">
           <span className="text-xs text-gray-300">继承自本体版本，尚未确认</span>
         </div>

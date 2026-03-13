@@ -2,18 +2,18 @@ import React, { useState, useRef } from "react";
 import { Pencil, Sparkles, X } from "lucide-react";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
 import { ExperimentTitleAssist } from "./ExperimentTitleAssist";
-import { NewExperimentRecordButton } from "./NewExperimentRecordButton";
-import { EXPERIMENT_STATUS_OPTIONS } from "@/types/workbench";
+import { StatusPicker } from "./StatusPicker";
 
 /**
  * ExperimentHeader — top section of the OntologyPanel.
  *
  * Contains:
- *   - Editable title with hand-write / AI icons
- *   - Experiment status dropdown
+ *   - Editable title with hand-write / AI (Sparkles) icons
+ *   - StatusPicker (colored badge dropdown)
  *   - Experiment code input
- *   - Tag input area
- *   - New record button
+ *   - Tag input area with add/remove
+ *
+ * Note: the "+ 新建记录" button has moved to RecordSwitcher.
  */
 export function ExperimentHeader() {
   const {
@@ -41,20 +41,12 @@ export function ExperimentHeader() {
     }
   }
 
-  function handleAiToggle() {
-    setAiAssistOpen(!aiAssistOpen);
-  }
-
   return (
     <div className="flex flex-col gap-3 px-4 py-3 border-b border-gray-100 bg-white flex-shrink-0">
-      {/* Row 1: New record button */}
-      <div className="flex justify-end">
-        <NewExperimentRecordButton />
-      </div>
 
-      {/* Row 2: Title + mode icons */}
+      {/* Row 1: Title + write / AI icons */}
       <div className="relative">
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={currentRecord.title}
@@ -63,7 +55,7 @@ export function ExperimentHeader() {
             className="flex-1 min-w-0 text-sm font-semibold text-gray-900 bg-transparent outline-none border-b border-gray-200 focus:border-gray-500 pb-0.5 placeholder-gray-300 transition-colors"
           />
 
-          {/* Hand-write indicator (just a visual cue) */}
+          {/* Hand-write icon — visual cue only */}
           <button
             title="手写标题"
             className="flex-shrink-0 p-1 text-gray-300 hover:text-gray-600 transition-colors rounded"
@@ -74,7 +66,7 @@ export function ExperimentHeader() {
           {/* AI assist toggle */}
           <button
             title="AI 辅助生成标题"
-            onClick={handleAiToggle}
+            onClick={() => setAiAssistOpen(!aiAssistOpen)}
             className={[
               "flex-shrink-0 p-1 rounded transition-colors",
               aiAssistOpen
@@ -86,23 +78,16 @@ export function ExperimentHeader() {
           </button>
         </div>
 
-        {/* AI assist popover — positioned relative to the title row */}
+        {/* AI assist popover anchored below the title row */}
         <ExperimentTitleAssist />
       </div>
 
-      {/* Row 3: Status + Code */}
+      {/* Row 2: Status badge + experiment code */}
       <div className="flex items-center gap-2">
-        <select
+        <StatusPicker
           value={currentRecord.experimentStatus}
-          onChange={(e) => updateStatus(e.target.value as typeof currentRecord.experimentStatus)}
-          className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-600 bg-white outline-none focus:border-gray-400 cursor-pointer"
-        >
-          {EXPERIMENT_STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+          onChange={updateStatus}
+        />
 
         <input
           type="text"
@@ -113,7 +98,7 @@ export function ExperimentHeader() {
         />
       </div>
 
-      {/* Row 4: Tags */}
+      {/* Row 3: Tags */}
       <div
         className="flex flex-wrap items-center gap-1.5 min-h-[24px] cursor-text"
         onClick={() => tagInputRef.current?.focus()}

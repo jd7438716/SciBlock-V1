@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
+import { RecordSwitcher } from "./RecordSwitcher";
 import { OntologyPanel } from "./OntologyPanel";
 import { EditorPanel } from "./EditorPanel";
 import { UtilityRail } from "./UtilityRail";
@@ -10,12 +11,12 @@ import type { WorkbenchFocusMode } from "@/types/workbench";
 const ONTOLOGY_WIDTH: Record<WorkbenchFocusMode, string> = {
   ontology: "48%",
   balanced: "34%",
-  editor: "20%",
+  editor:   "20%",
 };
 
 /**
- * FocusDivider — the thin strip between OntologyPanel and EditorPanel.
- * Two chevron buttons let the user shift the layout focus left or right.
+ * FocusDivider — thin vertical strip between OntologyPanel and EditorPanel.
+ * Two chevrons shift focus left (expand editor) or right (expand ontology).
  */
 function FocusDivider() {
   const { focusMode, setFocusMode } = useWorkbench();
@@ -53,35 +54,43 @@ function FocusDivider() {
 }
 
 /**
- * WorkbenchLayout — three-panel layout:
- *   OntologyPanel | FocusDivider | EditorPanel | UtilityRail
+ * WorkbenchLayout — full page layout inside WorkbenchProvider.
  *
- * OntologyPanel width changes with focusMode.
- * UtilityRail is always fixed and does not participate in focus adjustments.
+ *   [RecordSwitcher — full width tab bar]
+ *   [OntologyPanel | FocusDivider | EditorPanel | UtilityRail]
+ *
+ * OntologyPanel width is controlled by focusMode.
+ * UtilityRail is always fixed and unaffected by focus changes.
  */
 export function WorkbenchLayout() {
   const { focusMode } = useWorkbench();
 
   return (
-    <div className="flex flex-1 min-h-0 overflow-hidden">
-      {/* Left: Ontology panel — width controlled by focusMode */}
-      <div
-        style={{ width: ONTOLOGY_WIDTH[focusMode] }}
-        className="flex-shrink-0 transition-[width] duration-200 ease-in-out min-h-0"
-      >
-        <OntologyPanel />
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* Record switcher spans the full width above the three panels */}
+      <RecordSwitcher />
+
+      {/* Three-panel area */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left: ontology panel */}
+        <div
+          style={{ width: ONTOLOGY_WIDTH[focusMode] }}
+          className="flex-shrink-0 transition-[width] duration-200 ease-in-out min-h-0"
+        >
+          <OntologyPanel />
+        </div>
+
+        {/* Divider with focus arrows */}
+        <FocusDivider />
+
+        {/* Middle: editor — takes remaining space */}
+        <div className="flex-1 min-w-0 min-h-0">
+          <EditorPanel />
+        </div>
+
+        {/* Right: utility rail — always fixed */}
+        <UtilityRail />
       </div>
-
-      {/* Divider with focus arrows */}
-      <FocusDivider />
-
-      {/* Middle: Editor panel — takes remaining space */}
-      <div className="flex-1 min-w-0 min-h-0">
-        <EditorPanel />
-      </div>
-
-      {/* Right: Utility rail — always fixed */}
-      <UtilityRail />
     </div>
   );
 }

@@ -1,21 +1,48 @@
 import React from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams } from "wouter";
 import { FlaskConical } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
-import { WorkbenchProvider } from "@/contexts/WorkbenchContext";
+import { WorkbenchProvider, useWorkbench } from "@/contexts/WorkbenchContext";
 import { WorkbenchLayout } from "./WorkbenchLayout";
 
+// ---------------------------------------------------------------------------
+// Inner layout — runs inside WorkbenchProvider so it can read current title
+// ---------------------------------------------------------------------------
+
+interface InnerProps {
+  sciNoteTitle: string;
+}
+
 /**
- * ExperimentWorkbenchPage — entry point for the three-panel experiment workbench.
+ * WorkbenchAppLayout — renders AppLayout with a title that reflects the
+ * current experiment record's title in real time.
+ *
+ * Must be a child of WorkbenchProvider to access useWorkbench().
+ */
+function WorkbenchAppLayout({ sciNoteTitle }: InnerProps) {
+  const { currentRecord } = useWorkbench();
+  const pageTitle = currentRecord.title.trim() || "实验记录";
+
+  return (
+    <AppLayout title={pageTitle} noPadding>
+      <WorkbenchLayout />
+    </AppLayout>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page — thin wrapper, mounts provider, delegates everything else
+// ---------------------------------------------------------------------------
+
+/**
+ * ExperimentWorkbenchPage — route entry point.
  *
  * Route: /personal/experiment/:id/workbench
  *
- * Wraps WorkbenchProvider (scoped to this sciNote) so that the context
- * reinitialises automatically whenever the sciNoteId in the URL changes.
- *
- * The page itself is intentionally thin — all state and layout
- * live inside WorkbenchProvider and its children.
+ * WorkbenchProvider is mounted *outside* AppLayout so that WorkbenchAppLayout
+ * (inside the provider) can read the live record title and pass it to AppLayout.
+ * key={id} ensures the provider re-mounts when navigating to a different SciNote.
  */
 export function ExperimentWorkbenchPage() {
   const { id } = useParams<{ id: string }>();
@@ -35,12 +62,8 @@ export function ExperimentWorkbenchPage() {
   }
 
   return (
-    <AppLayout title={`${note.title} · 实验记录`} noPadding>
-      {/* key={id} ensures WorkbenchProvider re-mounts (and state resets)
-          when navigating between different SciNotes */}
-      <WorkbenchProvider key={id} sciNoteId={id}>
-        <WorkbenchLayout />
-      </WorkbenchProvider>
-    </AppLayout>
+    <WorkbenchProvider key={id} sciNoteId={id}>
+      <WorkbenchAppLayout sciNoteTitle={note.title} />
+    </WorkbenchProvider>
   );
 }

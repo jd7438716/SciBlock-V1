@@ -42,6 +42,7 @@ interface WorkbenchContextValue {
   setActiveModuleKey: (key: OntologyModuleKey) => void;
 
   // Record mutations
+  switchRecord: (recordId: string) => void;
   createNewRecord: () => void;
   updateTitle: (title: string) => void;
   updateStatus: (status: ExperimentStatus) => void;
@@ -158,6 +159,14 @@ export function WorkbenchProvider({ sciNoteId, children }: Props) {
   // ---------------------------------------------------------------------------
   // Record actions
   // ---------------------------------------------------------------------------
+
+  function switchRecord(recordId: string) {
+    if (records.find((r) => r.id === recordId)) {
+      setCurrentRecordId(recordId);
+      setFlowDraftInserted(false);
+      setAiAssistOpen(false);
+    }
+  }
 
   function createNewRecord() {
     const latestVersion =
@@ -293,6 +302,7 @@ export function WorkbenchProvider({ sciNoteId, children }: Props) {
     setFocusMode,
     activeModuleKey,
     setActiveModuleKey,
+    switchRecord,
     createNewRecord,
     updateTitle,
     updateStatus,
