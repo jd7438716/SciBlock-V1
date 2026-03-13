@@ -42,7 +42,7 @@ function GroupHeader({ group }: { group: NavGroup }) {
 
 export function AppSidebar() {
   const [location, navigate] = useLocation();
-  const { notes, renameSciNote } = useSciNoteStore();
+  const { notes, renameSciNote, deleteSciNote } = useSciNoteStore();
   const { draftName } = useNewExperimentDraft();
 
   // Tracks which SciNote (by id) is currently being renamed inline.
@@ -50,6 +50,9 @@ export function AppSidebar() {
 
   // Tracks which SciNote is pending confirmation for reinitialization.
   const [reinitConfirmNoteId, setReinitConfirmNoteId] = useState<string | null>(null);
+
+  // Tracks which SciNote is pending confirmation for deletion.
+  const [deleteConfirmNoteId, setDeleteConfirmNoteId] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Rename handlers
@@ -88,12 +91,32 @@ export function AppSidebar() {
   }
 
   // ---------------------------------------------------------------------------
-  // Delete handler (stub)
+  // Delete handlers
   // ---------------------------------------------------------------------------
 
-  function handleDelete(noteId: string) {
-    // TODO: show confirm dialog → call store.deleteSciNote(noteId)
-    console.log("[SciNote] delete:", noteId);
+  function handleDeleteRequest(noteId: string) {
+    setDeleteConfirmNoteId(noteId);
+  }
+
+  function handleDeleteConfirm() {
+    if (!deleteConfirmNoteId) return;
+    const deletedId = deleteConfirmNoteId;
+    setDeleteConfirmNoteId(null);
+
+    // If the user is currently viewing the note being deleted, navigate away.
+    const deletedNote = notes.find((n) => n.id === deletedId);
+    if (deletedNote) {
+      const deletedHref = sciNoteHref(deletedNote.kind, deletedId);
+      if (location === deletedHref || location.startsWith(`/personal/reinitialize/${deletedId}`)) {
+        navigate("/home");
+      }
+    }
+
+    deleteSciNote(deletedId);
+  }
+
+  function handleDeleteCancel() {
+    setDeleteConfirmNoteId(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -113,9 +136,13 @@ export function AppSidebar() {
     g.title === "个人" ? { ...g, items: draftItem ? [draftItem] : [] } : g,
   );
 
-  // Find the note targeted for reinitialization (for the confirm dialog text).
+  // Find the notes targeted for confirm dialogs (used in dialog description text).
   const reinitNote = reinitConfirmNoteId
     ? notes.find((n) => n.id === reinitConfirmNoteId)
+    : null;
+
+  const deleteNote = deleteConfirmNoteId
+    ? notes.find((n) => n.id === deleteConfirmNoteId)
     : null;
 
   return (
@@ -171,7 +198,7 @@ export function AppSidebar() {
                       }
                       onRenameCancel={handleRenameCancel}
                       onReinitialize={handleReinitRequest}
-                      onDelete={handleDelete}
+                      onDelete={handleDeleteRequest}
                     />
                   );
                 })}
@@ -205,6 +232,22 @@ export function AppSidebar() {
         danger
         onConfirm={handleReinitConfirm}
         onCancel={handleReinitCancel}
+      />
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={deleteConfirmNoteId !== null}
+        title="删除 SciNote"
+        description={
+          deleteNote
+            ? `「${deleteNote.title}」将被永久删除，包含其所有初始化数据及实验记录。此操作不可撤销。`
+            : "该 SciNote 将被永久删除，此操作不可撤销。"
+        }
+        confirmLabel="确认删除"
+        cancelLabel="取消"
+        danger
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
       />
     </aside>
   );

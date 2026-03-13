@@ -18,6 +18,8 @@ interface SciNoteStoreContextValue {
    * The note's id, title, kind, and createdAt are all preserved.
    */
   reinitializeSciNote: (id: string, newFormData: WizardFormData) => void;
+  /** Permanently remove a SciNote from the list. */
+  deleteSciNote: (id: string) => void;
 }
 
 const SciNoteStoreContext = createContext<SciNoteStoreContextValue | null>(null);
@@ -60,9 +62,13 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
     );
   }
 
+  function deleteSciNote(id: string) {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+  }
+
   return (
     <SciNoteStoreContext.Provider
-      value={{ notes, createSciNote, renameSciNote, reinitializeSciNote }}
+      value={{ notes, createSciNote, renameSciNote, reinitializeSciNote, deleteSciNote }}
     >
       {children}
     </SciNoteStoreContext.Provider>
