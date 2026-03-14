@@ -15,6 +15,7 @@ import { fetchPapers, addPaper, deletePaper } from "../../../api/team";
 
 interface Props {
   studentId: string;
+  onCountChange?: (count: number) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +218,7 @@ function PaperViewCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
+    <div className="bg-white border border-gray-100 rounded-xl shadow-sm group">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2">
         <TypeTag isThesis={paper.isThesis} />
@@ -277,22 +278,27 @@ function PaperViewCard({
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function PapersCard({ studentId }: Props) {
+export default function PapersCard({ studentId, onCountChange }: Props) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState<"published" | "thesis" | null>(null);
   const [editing, setEditing] = useState<Paper | null>(null);
 
+  function updatePapers(next: Paper[]) {
+    setPapers(next);
+    onCountChange?.(next.length);
+  }
+
   useEffect(() => {
     fetchPapers(studentId)
-      .then(r => setPapers(r.papers))
+      .then(r => { setPapers(r.papers); onCountChange?.(r.papers.length); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [studentId]);
 
   async function handleSave(data: AddPaperRequest) {
     const { paper } = await addPaper(studentId, data);
-    setPapers(ps => [paper, ...ps]);
+    updatePapers([paper, ...papers]);
     setAdding(null);
     setEditing(null);
   }
@@ -301,7 +307,7 @@ export default function PapersCard({ studentId }: Props) {
     if (!confirm("确认删除该论文？")) return;
     try {
       await deletePaper(studentId, id);
-      setPapers(ps => ps.filter(p => p.id !== id));
+      updatePapers(papers.filter(p => p.id !== id));
     } catch { /* ignore */ }
   }
 
@@ -357,7 +363,7 @@ export default function PapersCard({ studentId }: Props) {
                     // For edit, delete old and create new
                     await deletePaper(studentId, p.id);
                     const { paper: newP } = await addPaper(studentId, data);
-                    setPapers(ps => [newP, ...ps.filter(x => x.id !== p.id)]);
+                    updatePapers([newP, ...papers.filter(x => x.id !== p.id)]);
                     setEditing(null);
                   }}
                   onCancel={() => setEditing(null)}

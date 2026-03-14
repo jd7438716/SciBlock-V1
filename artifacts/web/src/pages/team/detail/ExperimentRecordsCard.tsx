@@ -34,7 +34,7 @@ function kindMeta(kind: SciNote["kind"]) {
 function RecordRow({ note, onClick }: { note: SciNote; onClick: () => void }) {
   const meta = kindMeta(note.kind);
   return (
-    <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
+    <div className="bg-white border border-gray-100 rounded-xl shadow-sm group">
       <div className="flex items-center gap-2 px-3 py-2">
         {/* Kind tag */}
         <span

@@ -16,6 +16,7 @@ import { fetchReports, addReport } from "../../../api/team";
 
 interface Props {
   studentId: string;
+  onCountChange?: (count: number) => void;
 }
 
 const INITIAL_LIMIT = 5;
@@ -118,7 +119,7 @@ function ReportCard({ report }: { report: WeeklyReport }) {
   })();
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
+    <div className="bg-white border border-gray-100 rounded-xl shadow-sm group">
       <div className="flex items-center gap-2 px-3 py-2">
         {/* Week tag */}
         <span className="flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap bg-gray-100 text-gray-500 border-gray-200">
@@ -164,22 +165,27 @@ function ReportCard({ report }: { report: WeeklyReport }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function WeeklyReportsCard({ studentId }: Props) {
+export default function WeeklyReportsCard({ studentId, onCountChange }: Props) {
   const [reports, setReports] = useState<WeeklyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
+  function updateReports(next: WeeklyReport[]) {
+    setReports(next);
+    onCountChange?.(next.length);
+  }
+
   useEffect(() => {
     fetchReports(studentId)
-      .then(r => setReports(r.reports))
+      .then(r => { setReports(r.reports); onCountChange?.(r.reports.length); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [studentId]);
 
   async function handleSave(data: AddWeeklyReportRequest) {
     const { report } = await addReport(studentId, data);
-    setReports(rs => [report, ...rs]);
+    updateReports([report, ...reports]);
     setShowForm(false);
   }
 

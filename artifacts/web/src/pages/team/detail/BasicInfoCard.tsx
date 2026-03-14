@@ -90,10 +90,13 @@ function FieldPill({ label, value, inputWidth = "w-28", multiline = false, onSav
   return (
     <span
       onClick={start}
-      className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 rounded-full px-2.5 py-0.5 group/pill cursor-pointer transition-colors"
+      className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-blue-50 hover:border-blue-100 border border-transparent rounded-full px-3 py-1 cursor-pointer transition-all group/pill"
+      title="点击编辑"
     >
-      <span className="text-xs text-slate-600">
-        {label}: {value || <span className="text-slate-300 italic">未填写</span>}
+      <span className="text-[11px] font-medium text-slate-500">{label}</span>
+      <span className="w-px h-2.5 bg-slate-300 group-hover/pill:bg-blue-200 transition-colors" />
+      <span className="text-[11px] text-slate-700">
+        {value || <span className="text-slate-300 italic">未填写</span>}
       </span>
     </span>
   );
@@ -338,9 +341,9 @@ export default function BasicInfoCard({ student, onUpdated }: Props) {
   }
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
+    <div className="bg-white border border-gray-100 rounded-xl shadow-sm group">
       {/* Header row */}
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-50">
         {/* Degree tag — click to pick inline */}
         {editingDegree ? (
           <DegreePicker
@@ -351,7 +354,7 @@ export default function BasicInfoCard({ student, onUpdated }: Props) {
         ) : (
           <button
             onClick={() => setEditingDegree(true)}
-            className="flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap bg-gray-100 text-gray-500 border-gray-200 hover:opacity-70 transition-opacity"
+            className="flex-shrink-0 text-[10px] font-semibold border rounded-md px-2 py-1 leading-none whitespace-nowrap bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 transition-colors"
             title="点击修改学位"
           >
             {DEGREE_LABELS[student.degree] ?? student.degree}
@@ -361,26 +364,27 @@ export default function BasicInfoCard({ student, onUpdated }: Props) {
         {/* Name — click to enter full edit mode */}
         <button
           onClick={() => setEditingFull(true)}
-          className="flex-1 text-sm font-medium text-gray-800 text-left hover:text-blue-700 transition-colors leading-snug min-w-0 truncate"
-          title="点击编辑"
+          className="flex-1 text-sm font-semibold text-gray-900 text-left hover:text-blue-600 transition-colors leading-snug min-w-0 truncate"
+          title="点击编辑全部信息"
         >
           {student.name}
         </button>
 
         {/* Action buttons (hover) */}
-        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => setEditingFull(true)}
-            className="p-1 rounded text-gray-400 hover:text-gray-700 transition-colors"
-            title="编辑信息"
+            className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 border border-gray-200 hover:border-gray-300 px-2 py-1 rounded-md transition-colors bg-white"
+            title="编辑全部信息"
           >
-            <Pencil size={11} />
+            <Pencil size={10} />
+            编辑
           </button>
         </div>
       </div>
 
       {/* Attribute pills */}
-      <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+      <div className="px-4 py-3 flex flex-wrap gap-2">
         <FieldPill
           label="入学年份"
           value={`${student.enrollmentYear}年`}
