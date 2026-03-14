@@ -4,6 +4,7 @@ import React, {
   useState,
   useRef,
   useCallback,
+  useEffect,
 } from "react";
 import type {
   OntologyModule,
@@ -81,6 +82,32 @@ interface WorkbenchContextValue {
 }
 
 // ---------------------------------------------------------------------------
+// sessionStorage helpers — persist records between route unmounts/remounts
+// ---------------------------------------------------------------------------
+
+const storageKey = (sciNoteId: string) => `sciblock:workbench:${sciNoteId}`;
+
+function loadPersistedRecords(sciNoteId: string): ExperimentRecord[] {
+  try {
+    const raw = sessionStorage.getItem(storageKey(sciNoteId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as ExperimentRecord[];
+  } catch {
+    return [];
+  }
+}
+
+function savePersistedRecords(sciNoteId: string, records: ExperimentRecord[]) {
+  try {
+    sessionStorage.setItem(storageKey(sciNoteId), JSON.stringify(records));
+  } catch {
+    // sessionStorage may be unavailable (private mode quota exceeded etc.)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
 
@@ -113,12 +140,36 @@ export function WorkbenchProvider({
 }: Props) {
   const trash = useTrash();
 
-  // Seed one initial record + any restored records for this sciNote.
   const [ontologyVersions] = useState<OntologyVersion[]>(SEED_ONTOLOGY_VERSIONS);
 
+  /**
+   * Initialise the records list with THREE-tier priority:
+   *
+   *  1. Persisted records (sessionStorage) — records the user created/edited
+   *     in the current browser tab before navigating away from the workbench.
+   *     This is the SOURCE OF TRUTH for existing records.
+   *
+   *  2. extraRecords (trash-restored) — records just returned from the trash.
+   *     These are MERGED onto top of the persisted list, deduplicated by id.
+   *     This guarantees restore = "add back", not "rebuild from scratch".
+   *
+   *  3. Seed record — only used when there are NO persisted records at all
+   *     (genuine first visit to this workbench). Never injected over persisted
+   *     data to avoid displacing records the user already created.
+   */
   const [records, setRecords] = useState<ExperimentRecord[]>(() => {
+    const persisted = loadPersistedRecords(sciNoteId);
+
+    if (persisted.length > 0) {
+      // --- Case A: returning visit — use persisted records as the base ---
+      // Merge in any trash-restored extras (incremental, not a full replace).
+      const existingIds = new Set(persisted.map((r) => r.id));
+      const incoming = extraRecords.filter((r) => !existingIds.has(r.id));
+      return [...persisted, ...incoming];
+    }
+
+    // --- Case B: first visit — no persisted data, start fresh ---
     const seed = createExperimentRecord(sciNoteId, DEFAULT_ONTOLOGY_VERSION, 1);
-    // Deduplicate by record id — defense-in-depth against pool not being cleared
     const seen = new Set<string>([seed.id]);
     const deduped = extraRecords.filter((r) => {
       if (seen.has(r.id)) return false;
@@ -127,6 +178,13 @@ export function WorkbenchProvider({
     });
     return [seed, ...deduped];
   });
+
+  // Persist records to sessionStorage whenever they change so that navigating
+  // away and back does NOT lose records the user created in this session.
+  useEffect(() => {
+    savePersistedRecords(sciNoteId, records);
+  }, [sciNoteId, records]);
+
   const [currentRecordId, setCurrentRecordId] = useState<string>(
     () => records[0].id,
   );
