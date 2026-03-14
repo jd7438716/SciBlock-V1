@@ -6,6 +6,7 @@ import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import { useTrash } from "@/contexts/TrashContext";
 import { WorkbenchProvider, useWorkbench } from "@/contexts/WorkbenchContext";
 import { WorkbenchLayout } from "./WorkbenchLayout";
+import { wizardToModules } from "@/data/workbenchUtils";
 import type { ExperimentRecord } from "@/types/workbench";
 
 // ---------------------------------------------------------------------------
@@ -79,11 +80,17 @@ export function ExperimentWorkbenchPage() {
     );
   }
 
+  // Derive initial modules from wizard formData when available.
+  // This is only used on the very first visit (Case B in WorkbenchProvider).
+  // On returning visits, persisted sessionStorage records take priority.
+  const initialModules = note.formData ? wizardToModules(note.formData) : undefined;
+
   return (
     <WorkbenchProvider
       key={id}
       sciNoteId={id}
       sciNoteTitle={note.title}
+      initialModules={initialModules}
       extraRecords={extraRecordsRef.current}
     >
       <WorkbenchAppLayout />

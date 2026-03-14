@@ -5,6 +5,17 @@ import type {
   ExperimentRecord,
   PurposeAssistResult,
 } from "@/types/workbench";
+import type { OntologyModuleStructuredData } from "@/types/ontologyModules";
+import type {
+  SystemObject,
+  PrepItem,
+  OperationStep,
+  MeasurementItem,
+  DataItem,
+} from "@/types/ontologyModules";
+import type { ExperimentField } from "@/types/experimentFields";
+import type { WizardFormData } from "@/types/wizardForm";
+import { makeTag } from "@/types/experimentFields";
 
 // ---------------------------------------------------------------------------
 // ID generation
@@ -47,6 +58,33 @@ export function createExperimentRecord(
     tags: [],
     inheritedOntologyVersionId: inheritedVersion.id,
     currentModules: cloneModules(inheritedVersion.modules),
+    editorContent: "",
+    createdAt: now,
+  };
+}
+
+/**
+ * Variant of createExperimentRecord that accepts a pre-built module list
+ * (e.g. from wizardToModules) instead of an OntologyVersion.
+ * Used on first workbench visit when wizard form data is available.
+ */
+export function createExperimentRecordWithModules(
+  sciNoteId: string,
+  modules: OntologyModule[],
+  index: number,
+): ExperimentRecord {
+  const now = new Date().toISOString();
+  const pad = (n: number) => String(n).padStart(3, "0");
+  return {
+    id: generateId("rec"),
+    sciNoteId,
+    title: "",
+    purposeInput: undefined,
+    experimentStatus: "探索中",
+    experimentCode: `EXP-${pad(index)}`,
+    tags: [],
+    inheritedOntologyVersionId: "wizard_generated",
+    currentModules: cloneModules(modules),
     editorContent: "",
     createdAt: now,
   };
@@ -140,4 +178,295 @@ export function generateFlowDraft(modules: OntologyModule[]): string {
   lines.push("<p><strong>预期输出：</strong>各步骤完成后记录原始数据，汇总至实验数据模块。</p>");
 
   return lines.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// wizardToModules — WizardFormData → OntologyModule[] (real inheritance)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build an OntologyModule shell with shared defaults.
+ * All modules start as "inherited" (unconfirmed) so the user sees
+ * them highlighted for review on first workbench visit.
+ */
+function makeModule(
+  key: OntologyModuleKey,
+  title: string,
+  structuredData: OntologyModuleStructuredData,
+): OntologyModule {
+  return {
+    key,
+    title,
+    structuredData,
+    status: "inherited",
+    isHighlighted: false,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// ----- Step 2 → 实验系统 -----
+
+/**
+ * Step 2 fields are experiment-level metadata (实验名称, 实验类型, 实验目标).
+ * These don't map to hardware/material objects directly, so we:
+ *   1. Collect all non-empty text fields as attributes on a synthetic
+ *      "实验概要" SystemObject (preserves all metadata without data loss).
+ *   2. Map any user-added object-type fields to regular SystemObjects,
+ *      using the field category name as the role.
+ */
+function step2ToSystemObjects(fields: ExperimentField[]): SystemObject[] {
+  const objects: SystemObject[] = [];
+
+  const metaAttrs = fields
+    .filter((f) => f.type === "text" && f.value.trim())
+    .map((f) => makeTag(f.name, f.value.trim()));
+
+  if (metaAttrs.length > 0) {
+    objects.push({
+      id: generateId("sys-meta"),
+      name: "实验概要",
+      role: "实验信息",
+      attributes: metaAttrs,
+    });
+  }
+
+  for (const field of fields) {
+    if (field.type !== "object") continue;
+    for (const item of field.objects) {
+      if (!item.name.trim()) continue;
+      objects.push({
+        id: generateId("sys"),
+        name: item.name.trim(),
+        role: field.name,
+        attributes: item.tags,
+      });
+    }
+  }
+
+  return objects;
+}
+
+// ----- Step 3 → 实验准备 -----
+
+/**
+ * The field category name (e.g. "准备材料", "准备设备", "前处理事项")
+ * becomes PrepItem.category — a key insight that gives free ontology
+ * inheritance without any hardcoded enum.
+ *
+ * object fields: each ObjectItem → PrepItem (name + attributes)
+ * list fields:   each string   → PrepItem (name only)
+ * text fields:   the value     → PrepItem (name only, if non-empty)
+ */
+function step3ToPrepItems(fields: ExperimentField[]): PrepItem[] {
+  const items: PrepItem[] = [];
+
+  for (const field of fields) {
+    if (field.type === "object") {
+      for (const obj of field.objects) {
+        if (!obj.name.trim()) continue;
+        items.push({
+          id: generateId("prep"),
+          name: obj.name.trim(),
+          category: field.name,
+          attributes: obj.tags,
+        });
+      }
+    } else if (field.type === "list") {
+      for (const text of field.items) {
+        if (!text.trim()) continue;
+        items.push({
+          id: generateId("prep"),
+          name: text.trim(),
+          category: field.name,
+          attributes: [],
+        });
+      }
+    } else if (field.type === "text" && field.value.trim()) {
+      items.push({
+        id: generateId("prep"),
+        name: field.value.trim(),
+        category: field.name,
+        attributes: [],
+      });
+    }
+  }
+
+  return items;
+}
+
+// ----- Step 4 → 实验操作 -----
+
+/**
+ * order is assigned sequentially across ALL step4 fields so the
+ * global procedure order is preserved.
+ *
+ * object fields: each ObjectItem → OperationStep (name + params)
+ * list fields:   each string   → OperationStep (name only, notes = field name)
+ * text fields:   the value     → OperationStep (name only)
+ *
+ * For items that come from a field that is NOT "操作步骤", the field
+ * name is stored in OperationStep.notes so the origin is traceable
+ * without polluting the step name.
+ */
+function step4ToOperationSteps(fields: ExperimentField[]): OperationStep[] {
+  const steps: OperationStep[] = [];
+  let order = 1;
+
+  for (const field of fields) {
+    if (field.type === "object") {
+      for (const obj of field.objects) {
+        if (!obj.name.trim()) continue;
+        steps.push({
+          id: generateId("step"),
+          order: order++,
+          name: obj.name.trim(),
+          params: obj.tags,
+          notes: field.name !== "操作步骤" ? field.name : undefined,
+        });
+      }
+    } else if (field.type === "list") {
+      for (const text of field.items) {
+        if (!text.trim()) continue;
+        steps.push({
+          id: generateId("step"),
+          order: order++,
+          name: text.trim(),
+          params: [],
+          notes: field.name,
+        });
+      }
+    } else if (field.type === "text" && field.value.trim()) {
+      steps.push({
+        id: generateId("step"),
+        order: order++,
+        name: field.value.trim(),
+        params: [],
+        notes: field.name !== "操作步骤" ? field.name : undefined,
+      });
+    }
+  }
+
+  return steps;
+}
+
+// ----- Step 5 → 测量过程 -----
+
+/**
+ * TODO: Step 5's four-field structure (测量方法 / 测量对象 / 测量条件 / 测量仪器)
+ * is semantically misaligned with MeasurementItem, which collapses all four
+ * into sub-fields of a single card. A full mapping requires restructuring how
+ * step 5 collects data (e.g. one object-card per measurement, with named tags).
+ *
+ * Best-effort for this round:
+ *   - Each ObjectItem across all step5 fields → one MeasurementItem
+ *   - ObjectItem.name → MeasurementItem.name
+ *   - ObjectItem.tags → MeasurementItem.conditions
+ *   - method / instrument / target populated when field name gives a clear hint
+ *
+ * The original step5 data is preserved on SciNote.formData and will not be lost.
+ */
+function step5ToMeasurementItems(fields: ExperimentField[]): MeasurementItem[] {
+  const items: MeasurementItem[] = [];
+
+  for (const field of fields) {
+    if (field.type === "object") {
+      for (const obj of field.objects) {
+        if (!obj.name.trim()) continue;
+        items.push({
+          id: generateId("meas"),
+          name: obj.name.trim(),
+          instrument: field.name === "测量仪器" ? obj.name.trim() : undefined,
+          method:     field.name === "测量方法" ? obj.name.trim() : undefined,
+          target:     field.name === "测量对象" ? obj.name.trim() : "",
+          conditions: obj.tags,
+        });
+      }
+    } else if (field.type === "list") {
+      for (const text of field.items) {
+        if (!text.trim()) continue;
+        items.push({
+          id: generateId("meas"),
+          name: text.trim(),
+          target: "",
+          conditions: [],
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+// ----- Step 6 → 实验数据 -----
+
+/**
+ * object fields: each ObjectItem → DataItem (name + attributes)
+ * list fields:   each string   → DataItem (name only, description = field name)
+ * text fields:   the value     → DataItem (name only)
+ *
+ * For items from a non-default field (e.g. "结果指标"), the field name is
+ * stored in DataItem.description so the semantic origin is preserved.
+ */
+function step6ToDataItems(fields: ExperimentField[]): DataItem[] {
+  const items: DataItem[] = [];
+
+  for (const field of fields) {
+    if (field.type === "object") {
+      for (const obj of field.objects) {
+        if (!obj.name.trim()) continue;
+        items.push({
+          id: generateId("data"),
+          name: obj.name.trim(),
+          attributes: obj.tags,
+          description: field.name !== "数据项" ? field.name : undefined,
+        });
+      }
+    } else if (field.type === "list") {
+      for (const text of field.items) {
+        if (!text.trim()) continue;
+        items.push({
+          id: generateId("data"),
+          name: text.trim(),
+          attributes: [],
+          description: field.name,
+        });
+      }
+    } else if (field.type === "text" && field.value.trim()) {
+      items.push({
+        id: generateId("data"),
+        name: field.value.trim(),
+        attributes: [],
+        description: field.name !== "数据项" ? field.name : undefined,
+      });
+    }
+  }
+
+  return items;
+}
+
+// ----- Public entry point -----
+
+/**
+ * wizardToModules — pure function that converts wizard form data into the
+ * initial OntologyModule list for a new SciNote workbench.
+ *
+ * Coverage:
+ *   Step 2 → 实验系统   metadata as "实验概要" SystemObject + any object fields
+ *   Step 3 → 实验准备   object/list/text fields → PrepItem[] (field name = category)
+ *   Step 4 → 实验操作   object/list/text fields → OperationStep[] (sequential order)
+ *   Step 5 → 测量过程   best-effort; each ObjectItem → MeasurementItem (TODO: full map)
+ *   Step 6 → 实验数据   object/list/text fields → DataItem[]
+ *
+ * Called once per SciNote on first workbench visit. Never mutates its input.
+ * Replace DEFAULT_ONTOLOGY_VERSION fallback with the result of this function
+ * whenever formData is available.
+ */
+export function wizardToModules(formData: WizardFormData): OntologyModule[] {
+  return [
+    makeModule("system",      "实验系统", { systemObjects:    step2ToSystemObjects(formData.step2.fields) }),
+    makeModule("preparation", "实验准备", { prepItems:        step3ToPrepItems(formData.step3.fields)    }),
+    makeModule("operation",   "实验操作", { operationSteps:   step4ToOperationSteps(formData.step4.fields) }),
+    makeModule("measurement", "测量过程", { measurementItems: step5ToMeasurementItems(formData.step5.fields) }),
+    makeModule("data",        "实验数据", { dataItems:        step6ToDataItems(formData.step6.fields)    }),
+  ];
 }

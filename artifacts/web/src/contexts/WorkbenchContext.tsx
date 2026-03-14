@@ -23,6 +23,7 @@ import {
 } from "@/data/workbenchMockData";
 import {
   createExperimentRecord,
+  createExperimentRecordWithModules,
   mockPurposeAssist,
   generateFlowDraft,
 } from "@/data/workbenchUtils";
@@ -106,6 +107,13 @@ interface Props {
   sciNoteId: string;
   /** Display title of the parent SciNote — stored in DeletedRecord on trash. */
   sciNoteTitle: string;
+  /**
+   * Pre-built module list derived from the wizard form data (via wizardToModules).
+   * Used on the very first workbench visit instead of DEFAULT_ONTOLOGY_VERSION so
+   * that wizard content is truly inherited rather than replaced by mock data.
+   * Ignored on returning visits (persisted sessionStorage records take priority).
+   */
+  initialModules?: OntologyModule[];
   /** Extra records to seed (e.g. ones previously restored from trash). */
   extraRecords?: ExperimentRecord[];
   children: React.ReactNode;
@@ -114,6 +122,7 @@ interface Props {
 export function WorkbenchProvider({
   sciNoteId,
   sciNoteTitle,
+  initialModules,
   extraRecords = [],
   children,
 }: Props) {
@@ -148,7 +157,11 @@ export function WorkbenchProvider({
     }
 
     // --- Case B: first visit — no persisted data, start fresh ---
-    const seed = createExperimentRecord(sciNoteId, DEFAULT_ONTOLOGY_VERSION, 1);
+    // Prefer wizard-derived modules when available; fall back to mock data only
+    // when the SciNote has no formData (e.g. legacy notes, non-wizard creation).
+    const seed = initialModules
+      ? createExperimentRecordWithModules(sciNoteId, initialModules, 1)
+      : createExperimentRecord(sciNoteId, DEFAULT_ONTOLOGY_VERSION, 1);
     const seen = new Set<string>([seed.id]);
     const deduped = extraRecords.filter((r) => {
       if (seen.has(r.id)) return false;
