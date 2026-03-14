@@ -12,22 +12,11 @@ import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { PrepItem } from "@/types/ontologyModules";
+import { PREP_CATEGORY } from "@/config/ontologyOptions";
 import { ItemField } from "./shared/ItemField";
 import { AttachmentArea } from "./shared/AttachmentArea";
 import { AttributeTagRow } from "./shared/AttributeTagRow";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const CATEGORY_OPTIONS = ["基底清洗", "表面活化", "靶材处理", "气体配置", "其他"] as const;
-
-const CATEGORY_COLORS: Record<string, string> = {
-  基底清洗: "bg-sky-50 text-sky-700 border-sky-200",
-  表面活化: "bg-amber-50 text-amber-700 border-amber-200",
-  靶材处理: "bg-violet-50 text-violet-700 border-violet-200",
-  气体配置: "bg-teal-50 text-teal-700 border-teal-200",
-};
+import { OntologyPicker } from "./shared/OntologyPicker";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,7 +27,7 @@ function makeId(): string {
 }
 
 function makeBlankPrepItem(): PrepItem {
-  return { id: makeId(), name: "", category: "基底清洗", attributes: [], attachments: [] };
+  return { id: makeId(), name: "", category: PREP_CATEGORY.defaultValue, attributes: [], attachments: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -99,23 +88,11 @@ function PrepItemEditCard({ draft, onChange, onSave, onCancel }: EditCardProps) 
         </ItemField>
 
         <ItemField label="分类">
-          <div className="flex flex-wrap gap-1.5">
-            {CATEGORY_OPTIONS.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => set("category", cat)}
-                className={[
-                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
-                  draft.category === cat
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-400",
-                ].join(" ")}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+          <OntologyPicker
+            value={draft.category}
+            options={PREP_CATEGORY.options}
+            onChange={(v) => set("category", v)}
+          />
         </ItemField>
 
         <ItemField label="属性参数" hint="点击标签修改；回车确认">
@@ -158,7 +135,7 @@ interface ViewCardProps {
 }
 
 function PrepItemViewCard({ item, onEdit, onDelete, onUpdate }: ViewCardProps) {
-  const catColor = CATEGORY_COLORS[item.category] ?? "bg-gray-100 text-gray-500 border-gray-200";
+  const catColor = PREP_CATEGORY.colors[item.category] ?? "bg-gray-100 text-gray-500 border-gray-200";
 
   return (
     <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">

@@ -17,21 +17,11 @@ import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { SystemObject } from "@/types/ontologyModules";
+import { SYSTEM_ROLE } from "@/config/ontologyOptions";
 import { ItemField } from "./shared/ItemField";
 import { AttachmentArea } from "./shared/AttachmentArea";
 import { AttributeTagRow } from "./shared/AttributeTagRow";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const ROLE_OPTIONS = ["研究基底", "靶材", "设备", "试剂", "其他"] as const;
-
-const ROLE_COLORS: Record<string, string> = {
-  研究基底: "bg-blue-50 text-blue-700 border-blue-200",
-  靶材:     "bg-violet-50 text-violet-700 border-violet-200",
-  设备:     "bg-gray-100 text-gray-600 border-gray-200",
-};
+import { OntologyPicker } from "./shared/OntologyPicker";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,7 +32,7 @@ function makeId(): string {
 }
 
 function makeBlankObject(): SystemObject {
-  return { id: makeId(), name: "", role: "研究基底", attributes: [], attachments: [] };
+  return { id: makeId(), name: "", role: SYSTEM_ROLE.defaultValue, attributes: [], attachments: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -105,23 +95,11 @@ function SystemObjectEditCard({ draft, onChange, onSave, onCancel }: EditCardPro
 
         {/* Role */}
         <ItemField label="角色">
-          <div className="flex flex-wrap gap-1.5">
-            {ROLE_OPTIONS.map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => set("role", role)}
-                className={[
-                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
-                  draft.role === role
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-400",
-                ].join(" ")}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
+          <OntologyPicker
+            value={draft.role}
+            options={SYSTEM_ROLE.options}
+            onChange={(v) => set("role", v)}
+          />
         </ItemField>
 
         {/* Attributes — same TagBadge as wizard */}
@@ -165,7 +143,7 @@ interface ViewCardProps {
 }
 
 function SystemObjectViewCard({ object, onEdit, onDelete, onUpdate }: ViewCardProps) {
-  const roleColor = ROLE_COLORS[object.role] ?? "bg-gray-100 text-gray-500 border-gray-200";
+  const roleColor = SYSTEM_ROLE.colors[object.role] ?? "bg-gray-100 text-gray-500 border-gray-200";
 
   return (
     <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
