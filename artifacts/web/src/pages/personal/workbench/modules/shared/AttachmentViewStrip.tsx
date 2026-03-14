@@ -137,6 +137,8 @@ export function AttachmentViewStrip({ attachments }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxName, setLightboxName] = useState<string>("");
+  // Brief "no URL" feedback shown when user double-clicks a doc/video without a server URL
+  const [noUrlFeedback, setNoUrlFeedback] = useState(false);
 
   if (attachments.length === 0) return null;
 
@@ -155,6 +157,26 @@ export function AttachmentViewStrip({ attachments }: Props) {
 
   function hasPreviewSource(att: AttachmentMeta): boolean {
     return !!(att.url ?? att.localPreviewUrl);
+  }
+
+  /**
+   * Double-click on any attachment row opens the attachment directly.
+   *   image            → lightbox (uses localPreviewUrl or url)
+   *   video / document → window.open(url) in new tab
+   *                      if no URL available → brief inline feedback
+   */
+  function handleDoubleClick(att: AttachmentMeta) {
+    if (att.type === "image") {
+      openLightbox(att);
+    } else {
+      const target = att.url ?? att.localPreviewUrl;
+      if (target) {
+        window.open(target, "_blank", "noopener,noreferrer");
+      } else {
+        setNoUrlFeedback(true);
+        setTimeout(() => setNoUrlFeedback(false), 2200);
+      }
+    }
   }
 
   return (
@@ -182,7 +204,15 @@ export function AttachmentViewStrip({ attachments }: Props) {
             return (
               <li
                 key={att.id}
-                className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5"
+                onDoubleClick={() => handleDoubleClick(att)}
+                className="flex items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5 cursor-pointer select-none"
+                title={
+                  att.type === "image"
+                    ? "双击预览图片"
+                    : preview
+                    ? "双击在新标签页打开"
+                    : "双击（接入文件服务后可预览）"
+                }
               >
                 {/* Thumbnail for images; styled icon block for others */}
                 {att.type === "image" && att.localPreviewUrl ? (
@@ -255,6 +285,14 @@ export function AttachmentViewStrip({ attachments }: Props) {
             );
           })}
         </ul>
+      )}
+
+      {/* ── No-URL feedback (shown briefly after double-clicking a doc/video with no server URL) ── */}
+      {noUrlFeedback && (
+        <p className="mt-1.5 text-[10px] text-amber-600 flex items-center gap-1">
+          <span aria-hidden>⚠</span>
+          接入文件服务后可预览
+        </p>
       )}
 
       {/* ── Image lightbox overlay ── */}
