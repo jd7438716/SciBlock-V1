@@ -100,6 +100,22 @@ const MODULE_TITLE_MAP: Record<OntologyModuleKey, string> = {
 };
 
 /**
+ * Derive a short item-name summary from a module's structuredData.
+ * Returns an array of HTML <li> strings, or an empty array if no data.
+ */
+function moduleItemLines(mod: OntologyModule): string[] {
+  const sd = mod.structuredData;
+  if (!sd) return [];
+  const names: string[] = [];
+  sd.systemObjects?.forEach((o) => names.push(o.name));
+  sd.prepItems?.forEach((p) => names.push(p.name));
+  sd.operationSteps?.forEach((s) => names.push(`步骤 ${s.order}：${s.name}`));
+  sd.measurementItems?.forEach((m) => names.push(m.name));
+  sd.dataItems?.forEach((d) => names.push(d.name));
+  return names.filter(Boolean).map((n) => `<li>${n}</li>`);
+}
+
+/**
  * Generates a mock experiment-flow draft based on the confirmed module contents.
  * Returns HTML compatible with TipTap's StarterKit.
  */
@@ -112,13 +128,12 @@ export function generateFlowDraft(modules: OntologyModule[]): string {
 
   for (const mod of modules) {
     lines.push(`<h4>${MODULE_TITLE_MAP[mod.key]}</h4>`);
-    // Convert plain-text content to HTML paragraphs
-    const paragraphs = mod.content
-      .split("\n")
-      .filter((l) => l.trim())
-      .map((l) => `<p>${l}</p>`)
-      .join("");
-    lines.push(paragraphs || "<p>（未填写）</p>");
+    const items = moduleItemLines(mod);
+    if (items.length > 0) {
+      lines.push(`<ul>${items.join("")}</ul>`);
+    } else {
+      lines.push("<p>（未填写）</p>");
+    }
   }
 
   lines.push("<hr>");

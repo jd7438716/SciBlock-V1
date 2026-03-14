@@ -10,20 +10,14 @@ interface Props {
 /**
  * StatusDot — shows the "confirmation light" next to each module tab.
  *
- * Design intent (per spec):
- *   未确认 (inherited / editing) → lit amber dot   (needs attention)
- *   已确认 (confirmed)           → dim gray dot    (done, no action needed)
+ * Design intent:
+ *   未确认 (inherited) → amber dot  (needs attention)
+ *   已确认 (confirmed) → gray dot   (done, no action needed)
  */
 function StatusDot({ status }: { status: OntologyModule["status"] }) {
   if (status === "confirmed") {
     return <span className="w-1.5 h-1.5 rounded-full bg-gray-200 flex-shrink-0" />;
   }
-  if (status === "editing") {
-    return (
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0 animate-pulse" />
-    );
-  }
-  // inherited
   return <span className="w-1.5 h-1.5 rounded-full bg-amber-300 flex-shrink-0" />;
 }
 

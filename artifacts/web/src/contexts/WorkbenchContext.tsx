@@ -61,7 +61,6 @@ interface WorkbenchContextValue {
   updateEditorContent: (html: string) => void;
 
   // Module mutations
-  updateModuleContent: (key: OntologyModuleKey, content: string) => void;
   updateModuleStructuredData: (key: OntologyModuleKey, data: OntologyModuleStructuredData) => void;
   setModuleStatus: (key: OntologyModuleKey, status: OntologyModuleStatus) => void;
   setModuleHighlights: (keys: OntologyModuleKey[]) => void;
@@ -293,15 +292,6 @@ export function WorkbenchProvider({
   // Module actions
   // ---------------------------------------------------------------------------
 
-  function updateModuleContent(key: OntologyModuleKey, content: string) {
-    const now = new Date().toISOString();
-    patchCurrentModules((modules) =>
-      modules.map((m) =>
-        m.key === key ? { ...m, content, status: "editing", updatedAt: now } : m,
-      ),
-    );
-  }
-
   function updateModuleStructuredData(
     key: OntologyModuleKey,
     data: OntologyModuleStructuredData,
@@ -405,7 +395,6 @@ export function WorkbenchProvider({
     addTag,
     removeTag,
     updateEditorContent,
-    updateModuleContent,
     updateModuleStructuredData,
     setModuleStatus,
     setModuleHighlights,
