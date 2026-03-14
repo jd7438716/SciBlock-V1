@@ -2,17 +2,22 @@
  * AttachmentViewStrip — read-only attachment display for ontology item view cards.
  *
  * Replaces the old "N 个附件" plain-text stub in all four module view cards
- * (Prep / Operation / Measurement / Data).
+ * (System / Prep / Operation / Measurement / Data).
  *
  * Behaviour:
  *   - Renders nothing when attachments = [].
  *   - Shows a collapsed summary row: [Paperclip] "N 个附件" [chevron].
  *   - Clicking expands a per-item list with thumbnail / type icon, type badge, size.
- *   - Images: thumbnail shows localPreviewUrl; click opens a full-screen lightbox.
- *     The lightbox also has a "open in new tab" button for copying the blob URL.
- *   - Videos / Documents: show a type icon; the ExternalLink button opens att.url
- *     or att.localPreviewUrl in a new tab.  Button is disabled (with tooltip) when
- *     no URL is available — expected in the current mock phase (no file server yet).
+ *   - Images  → in-app lightbox on click or double-click.
+ *   - Documents → in-app iframe overlay (blob URL converted from data URL) on
+ *                 click (action button) or double-click (row).
+ *   - Videos   → new browser tab on double-click.
+ *
+ * Storage safety net:
+ *   localPreviewUrl may be undefined if the strip/restore in workbenchStorage
+ *   failed (e.g. sessionStorage quota exceeded).  In that case this component
+ *   falls back to calling loadAttBlob(att.id) directly so the overlay still
+ *   opens for PDFs that were saved correctly to their own sessionStorage key.
  *
  * Does NOT contain any upload logic — upload stays in AttachmentArea.
  * Does NOT accept onChange — this is purely presentational.
@@ -30,9 +35,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { AttachmentMeta, AttachmentType } from "@/types/ontologyModules";
+import { loadAttBlob } from "@/data/attachmentStorage";
 
 // ---------------------------------------------------------------------------
-// Shared helpers (mirrors the ones in AttachmentArea; kept local to avoid coupling)
+// Shared helpers
 // ---------------------------------------------------------------------------
 
 function formatSize(bytes?: number): string {
@@ -45,18 +51,41 @@ function formatSize(bytes?: number): string {
 /**
  * Convert a data URL (base64) to a temporary blob URL.
  *
- * Browsers block data: URLs as iframe src (security policy since Chrome 60+).
- * We store files as data URLs for localStorage persistence, but must convert
+ * Browsers block `data:` URLs as iframe src (Chrome 60+ security policy).
+ * We store files as data URLs for sessionStorage persistence but must convert
  * them to blob URLs just before rendering inside an <iframe>.
- * The returned blob URL is valid for the lifetime of the current page.
+ * Returns null on failure (malformed data URL, quota, etc.).
  */
-function dataUrlToBlobUrl(dataUrl: string): string {
-  const [header, base64] = dataUrl.split(",");
-  const mime = header.match(/:(.*?);/)?.[1] ?? "application/octet-stream";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+function dataUrlToBlobUrl(dataUrl: string): string | null {
+  try {
+    const commaIdx = dataUrl.indexOf(",");
+    if (commaIdx === -1) return null;
+    const header = dataUrl.slice(0, commaIdx);
+    const base64 = dataUrl.slice(commaIdx + 1);
+    const mime = header.match(/:(.*?);/)?.[1] ?? "application/octet-stream";
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the best available URL for an attachment.
+ * Priority: localPreviewUrl (in-memory data URL) → sessionStorage fallback → att.url (server).
+ * Returns null when nothing is available.
+ */
+function resolveAttachmentSrc(att: AttachmentMeta): string | null {
+  if (att.localPreviewUrl) return att.localPreviewUrl;
+  // Safety net: the strip/restore in workbenchStorage might have failed to
+  // put localPreviewUrl back into React state; try the raw sessionStorage key.
+  const stored = loadAttBlob(att.id);
+  if (stored) return stored;
+  // Fall back to server URL (available after real file upload infra is added).
+  if (att.url) return att.url;
+  return null;
 }
 
 function TypeIcon({ type }: { type: AttachmentType }) {
@@ -97,7 +126,7 @@ interface LightboxProps {
 function ImageLightbox({ src, name, onClose }: LightboxProps) {
   return (
     <div
-      className="fixed inset-0 z-[999] bg-black/80 flex items-center justify-center"
+      className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center"
       onClick={onClose}
     >
       <div
@@ -110,7 +139,6 @@ function ImageLightbox({ src, name, onClose }: LightboxProps) {
           className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
         />
 
-        {/* Overlay controls — top-right */}
         <div className="absolute top-2 right-2 flex items-center gap-1.5">
           <a
             href={src}
@@ -131,7 +159,6 @@ function ImageLightbox({ src, name, onClose }: LightboxProps) {
           </button>
         </div>
 
-        {/* File name caption */}
         {name && (
           <p className="absolute bottom-0 left-0 right-0 text-center text-xs text-white/80 py-2 bg-gradient-to-t from-black/50 to-transparent rounded-b-lg pointer-events-none">
             {name}
@@ -152,41 +179,57 @@ interface Props {
 
 export function AttachmentViewStrip({ attachments }: Props) {
   const [expanded, setExpanded] = useState(false);
-  // Image lightbox
+
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxName, setLightboxName] = useState<string>("");
-  // Document/PDF in-app viewer
+
   const [docViewerSrc, setDocViewerSrc] = useState<string | null>(null);
   const [docViewerName, setDocViewerName] = useState<string>("");
-  // Track the temporary blob URL we create for iframe rendering so we can revoke it on close
   const docBlobUrlRef = useRef<string | null>(null);
-  // Brief feedback when a video has no URL at all
+
+  // Brief user-visible feedback when no preview URL is available
   const [noUrlFeedback, setNoUrlFeedback] = useState(false);
+  // Error feedback when blob conversion fails
+  const [blobErrorFeedback, setBlobErrorFeedback] = useState(false);
 
   if (attachments.length === 0) return null;
 
   function openLightbox(att: AttachmentMeta) {
-    const src = att.localPreviewUrl ?? att.url;
+    const src = resolveAttachmentSrc(att);
     if (src) { setLightboxSrc(src); setLightboxName(att.name); }
   }
 
   function openDocViewer(att: AttachmentMeta) {
-    const stored = att.url ?? att.localPreviewUrl;
-    if (!stored) return;
-    // Revoke any previously created blob URL (memory hygiene)
+    // Resolve the attachment data URL (local → sessionStorage fallback → server URL)
+    const src = resolveAttachmentSrc(att);
+    if (!src) {
+      // No URL available — show feedback
+      setNoUrlFeedback(true);
+      setTimeout(() => setNoUrlFeedback(false), 2200);
+      return;
+    }
+
+    // Revoke any previously created blob URL
     if (docBlobUrlRef.current) {
       URL.revokeObjectURL(docBlobUrlRef.current);
       docBlobUrlRef.current = null;
     }
+
     // Browsers block data: URLs as iframe src (Chrome 60+ security policy).
-    // Convert the stored data URL back to a temporary blob URL for the iframe.
-    // If the source is already a server URL or blob URL, use it as-is.
-    if (stored.startsWith("data:")) {
-      const blobUrl = dataUrlToBlobUrl(stored);
+    // Convert the data URL to a temporary blob URL for the iframe.
+    if (src.startsWith("data:")) {
+      const blobUrl = dataUrlToBlobUrl(src);
+      if (!blobUrl) {
+        // Conversion failed (malformed base64 etc.) — show error feedback
+        setBlobErrorFeedback(true);
+        setTimeout(() => setBlobErrorFeedback(false), 2500);
+        return;
+      }
       docBlobUrlRef.current = blobUrl;
       setDocViewerSrc(blobUrl);
     } else {
-      setDocViewerSrc(stored);
+      // Already a server URL or blob URL — use directly
+      setDocViewerSrc(src);
     }
     setDocViewerName(att.name);
   }
@@ -199,20 +242,21 @@ export function AttachmentViewStrip({ attachments }: Props) {
     setDocViewerSrc(null);
   }
 
-  function openExternal(att: AttachmentMeta) {
-    const target = att.url ?? att.localPreviewUrl;
-    if (target) window.open(target, "_blank", "noopener,noreferrer");
-  }
-
-  function hasPreviewSource(att: AttachmentMeta): boolean {
-    return !!(att.url ?? att.localPreviewUrl);
+  function openVideoExternal(att: AttachmentMeta) {
+    const target = resolveAttachmentSrc(att);
+    if (target) {
+      window.open(target, "_blank", "noopener,noreferrer");
+    } else {
+      setNoUrlFeedback(true);
+      setTimeout(() => setNoUrlFeedback(false), 2200);
+    }
   }
 
   /**
-   * Double-click any row to open the attachment:
-   *   image    → in-app lightbox  (data URL — survives refresh)
-   *   document → in-app iframe overlay with close button  (data URL — survives refresh)
-   *   video    → new tab  (blob URL — in-session only, data URL too large)
+   * Double-click handler for the attachment row <li>.
+   *   image    → in-app lightbox
+   *   document → in-app iframe overlay
+   *   video    → new tab (blob URL — data URLs for video are too large)
    */
   function handleDoubleClick(att: AttachmentMeta) {
     if (att.type === "image") {
@@ -220,15 +264,16 @@ export function AttachmentViewStrip({ attachments }: Props) {
     } else if (att.type === "document") {
       openDocViewer(att);
     } else {
-      // video
-      const target = att.url ?? att.localPreviewUrl;
-      if (target) {
-        window.open(target, "_blank", "noopener,noreferrer");
-      } else {
-        setNoUrlFeedback(true);
-        setTimeout(() => setNoUrlFeedback(false), 2200);
-      }
+      openVideoExternal(att);
     }
+  }
+
+  /** Whether there is any preview URL available (in-memory, storage, or server). */
+  function hasPreviewSource(att: AttachmentMeta): boolean {
+    if (att.localPreviewUrl) return true;
+    if (loadAttBlob(att.id)) return true;
+    if (att.url) return true;
+    return false;
   }
 
   return (
@@ -261,8 +306,12 @@ export function AttachmentViewStrip({ attachments }: Props) {
                 title={
                   att.type === "image"
                     ? "双击预览图片"
+                    : att.type === "document"
+                    ? preview
+                      ? "双击预览文档"
+                      : "双击（文件数据不可用）"
                     : preview
-                    ? "双击在新标签页打开"
+                    ? "双击在新标签页打开视频"
                     : "双击（接入文件服务后可预览）"
                 }
               >
@@ -311,7 +360,7 @@ export function AttachmentViewStrip({ attachments }: Props) {
                   </div>
                 </div>
 
-                {/* Action button: type-specific open action */}
+                {/* Action button: type-specific */}
                 {att.type === "image" ? (
                   <button
                     type="button"
@@ -328,7 +377,7 @@ export function AttachmentViewStrip({ attachments }: Props) {
                     onClick={() => openDocViewer(att)}
                     disabled={!preview}
                     className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-30 p-0.5 rounded"
-                    title={preview ? "预览文档" : "接入文件服务后可预览"}
+                    title={preview ? "预览文档" : "文件数据不可用"}
                   >
                     <ExternalLink size={12} />
                   </button>
@@ -336,7 +385,7 @@ export function AttachmentViewStrip({ attachments }: Props) {
                   // video → new tab
                   <button
                     type="button"
-                    onClick={() => openExternal(att)}
+                    onClick={() => openVideoExternal(att)}
                     disabled={!preview}
                     className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-30 p-0.5 rounded"
                     title={preview ? "在新标签页打开视频" : "接入文件服务后可预览"}
@@ -350,11 +399,17 @@ export function AttachmentViewStrip({ attachments }: Props) {
         </ul>
       )}
 
-      {/* ── No-URL feedback (shown briefly after double-clicking a doc/video with no server URL) ── */}
+      {/* ── Feedback messages ── */}
       {noUrlFeedback && (
         <p className="mt-1.5 text-[10px] text-amber-600 flex items-center gap-1">
           <span aria-hidden>⚠</span>
           接入文件服务后可预览
+        </p>
+      )}
+      {blobErrorFeedback && (
+        <p className="mt-1.5 text-[10px] text-red-500 flex items-center gap-1">
+          <span aria-hidden>⚠</span>
+          文件数据解析失败，请重新上传
         </p>
       )}
 
@@ -370,14 +425,14 @@ export function AttachmentViewStrip({ attachments }: Props) {
       {/* ── Document / PDF in-app viewer overlay ── */}
       {docViewerSrc && (
         <div
-          className="fixed inset-0 z-[999] bg-black/80 flex items-center justify-center"
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center"
           onClick={closeDocViewer}
         >
           <div
             className="relative w-[90vw] h-[90vh] bg-white rounded-lg overflow-hidden shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Top bar: file name + buttons */}
+            {/* Top bar */}
             <div className="flex-shrink-0 h-10 bg-gray-800 flex items-center justify-between px-3 gap-3">
               <span className="text-sm text-white truncate">{docViewerName}</span>
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -399,7 +454,7 @@ export function AttachmentViewStrip({ attachments }: Props) {
                 </button>
               </div>
             </div>
-            {/* iframe — blob URL (converted from data URL) so browser renders PDF natively */}
+            {/* iframe — blob URL (converted from data URL) renders PDF natively */}
             <iframe
               src={docViewerSrc}
               className="flex-1 w-full border-none"
