@@ -11,7 +11,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Check, X, Pencil } from "lucide-react";
 import type { Student, StudentDegree } from "../../../types/team";
-import { DEGREE_LABELS, DEGREE_OPTIONS, STATUS_LABELS, STATUS_COLORS } from "../../../types/team";
+import { DEGREE_LABELS, DEGREE_OPTIONS } from "../../../types/team";
 import { updateStudent } from "../../../api/team";
 
 // ---------------------------------------------------------------------------
@@ -314,8 +314,6 @@ export default function BasicInfoCard({ student, onUpdated }: Props) {
   const [editingFull, setEditingFull] = useState(false);
   const [editingDegree, setEditingDegree] = useState(false);
 
-  const sc = STATUS_COLORS[student.status] ?? STATUS_COLORS.active;
-
   async function saveField(patch: Partial<Student>) {
     const req: import("../../../types/team").UpdateStudentRequest = {
       name:           patch.name,
@@ -368,13 +366,6 @@ export default function BasicInfoCard({ student, onUpdated }: Props) {
         >
           {student.name}
         </button>
-
-        {/* Status tag */}
-        <span
-          className={`flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap ${sc.bg} ${sc.text} border-transparent`}
-        >
-          {STATUS_LABELS[student.status]}
-        </span>
 
         {/* Action buttons (hover) */}
         <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

@@ -20,9 +20,8 @@
 
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
-import { Plus } from "lucide-react";
 import type { Student } from "../../types/team";
-import { STATUS_LABELS, STATUS_COLORS, DEGREE_LABELS } from "../../types/team";
+import { DEGREE_LABELS } from "../../types/team";
 import { fetchMember } from "../../api/team";
 import BasicInfoCard        from "./detail/BasicInfoCard";
 import PapersCard           from "./detail/PapersCard";
@@ -114,8 +113,6 @@ export default function MemberDetailPage() {
     );
   }
 
-  const sc = STATUS_COLORS[student.status] ?? STATUS_COLORS.active;
-
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50/60">
 
@@ -157,12 +154,6 @@ export default function MemberDetailPage() {
               {/* Degree tag */}
               <span className="text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none bg-gray-100 text-gray-500 border-gray-200">
                 {DEGREE_LABELS[student.degree] ?? student.degree}
-              </span>
-              {/* Status tag */}
-              <span
-                className={`text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none border-transparent ${sc.bg} ${sc.text}`}
-              >
-                {STATUS_LABELS[student.status]}
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5 truncate">{student.researchTopic}</p>
