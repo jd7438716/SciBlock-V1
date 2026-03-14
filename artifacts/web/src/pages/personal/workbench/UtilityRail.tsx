@@ -8,7 +8,7 @@
  *
  * Panel widths:
  *   calendar   → 280px (needs space for 7-column month grid)
- *   ai         → 192px
+ *   ai         → 320px (chat interface needs comfortable reading width)
  *   default    → 176px
  *
  * Icons toggle their respective panels open/closed.
@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { CalendarPanel } from "./calendar/CalendarPanel";
+import { AiPanel } from "./ai/AiPanel";
 
 // ---------------------------------------------------------------------------
 // Rail config
@@ -43,7 +44,7 @@ interface RailItem {
 
 const RAIL_ITEMS: RailItem[] = [
   { key: "calendar",   Icon: CalendarDays,   label: "实验日历", panel: "calendar",     panelWidth: 280 },
-  { key: "ai",         Icon: Bot,            label: "AI 助手", panel: "ai",           panelWidth: 192 },
+  { key: "ai",         Icon: Bot,            label: "AI 助手", panel: "ai",           panelWidth: 320 },
   { key: "history",    Icon: History,         label: "历史实验", panel: "placeholder",  panelWidth: 176 },
   { key: "attachment", Icon: Paperclip,       label: "附件",    panel: "placeholder",  panelWidth: 176 },
   { key: "more",       Icon: MoreHorizontal,  label: "更多",    panel: "placeholder",  panelWidth: 176 },
@@ -58,12 +59,7 @@ function PanelContent({ item }: { item: RailItem }) {
     return <CalendarPanel isOpen />;
   }
   if (item.panel === "ai") {
-    return (
-      <div className="p-3 text-xs text-gray-500">
-        <p className="font-medium text-gray-700 mb-1">AI 助手</p>
-        <p className="text-gray-400">AI 实时对话功能开发中</p>
-      </div>
-    );
+    return <AiPanel isOpen />;
   }
   return (
     <div className="p-3 text-xs text-gray-400">功能开发中</div>
