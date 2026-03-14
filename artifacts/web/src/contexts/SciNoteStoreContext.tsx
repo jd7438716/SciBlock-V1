@@ -53,9 +53,12 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
 
   function createSciNote(formData: WizardFormData): string {
     const id = `exp-${Date.now()}`;
+    const fields = formData.step2.fields;
     const newNote: SciNote = {
       id,
-      title: getExperimentName(formData.step2.fields) || "未命名实验",
+      title: getExperimentName(fields) || "未命名实验",
+      experimentType: fields.find((f) => f.name === "实验类型")?.value?.trim() || undefined,
+      objective: fields.find((f) => f.name === "实验目标")?.value?.trim() || undefined,
       kind: "wizard",
       createdAt: new Date().toISOString(),
       formData,
@@ -71,11 +74,15 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
   }
 
   function reinitializeSciNote(id: string, newFormData: WizardFormData) {
+    const fields = newFormData.step2.fields;
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id
           ? {
               ...n,
+              title: getExperimentName(fields) || n.title,
+              experimentType: fields.find((f) => f.name === "实验类型")?.value?.trim() || undefined,
+              objective: fields.find((f) => f.name === "实验目标")?.value?.trim() || undefined,
               formData: newFormData,
               kind: "wizard",
             }

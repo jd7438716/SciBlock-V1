@@ -38,6 +38,10 @@ import { useTrash } from "@/contexts/TrashContext";
 // ---------------------------------------------------------------------------
 
 interface WorkbenchContextValue {
+  // SciNote-level metadata (read-only, from the parent SciNote)
+  experimentType?: string;
+  objective?: string;
+
   // Data
   records: ExperimentRecord[];
   currentRecord: ExperimentRecord;
@@ -107,6 +111,10 @@ interface Props {
   sciNoteId: string;
   /** Display title of the parent SciNote — stored in DeletedRecord on trash. */
   sciNoteTitle: string;
+  /** 实验类型 from the parent SciNote — displayed in the workbench info bar. */
+  experimentType?: string;
+  /** 实验目标 from the parent SciNote — displayed in the workbench info bar. */
+  objective?: string;
   /**
    * Pre-built module list derived from the wizard form data (via wizardToModules).
    * Used on the very first workbench visit instead of DEFAULT_ONTOLOGY_VERSION so
@@ -122,6 +130,8 @@ interface Props {
 export function WorkbenchProvider({
   sciNoteId,
   sciNoteTitle,
+  experimentType,
+  objective,
   initialModules,
   extraRecords = [],
   children,
@@ -392,6 +402,8 @@ export function WorkbenchProvider({
   // ---------------------------------------------------------------------------
 
   const value: WorkbenchContextValue = {
+    experimentType,
+    objective,
     records,
     currentRecord,
     ontologyVersions,

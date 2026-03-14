@@ -90,6 +90,8 @@ export function ExperimentWorkbenchPage() {
       key={id}
       sciNoteId={id}
       sciNoteTitle={note.title}
+      experimentType={note.experimentType}
+      objective={note.objective}
       initialModules={initialModules}
       extraRecords={extraRecordsRef.current}
     >

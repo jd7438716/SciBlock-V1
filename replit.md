@@ -20,7 +20,7 @@ React + Vite frontend. Routes:
 src/
 ├── types/                  # Shared TypeScript interfaces
 │   ├── auth.ts             # User, LoginRequest, LoginResponse
-│   ├── scinote.ts          # SciNote (id, title, kind, createdAt, formData)
+│   ├── scinote.ts          # SciNote (id, title, kind, createdAt, formData, experimentType?, objective?)
 │   └── wizardForm.ts       # WizardFormData (step2–step6 data shapes)
 ├── api/                    # All HTTP calls (one file per domain)
 │   ├── client.ts           # apiFetch() base wrapper + ApiError class

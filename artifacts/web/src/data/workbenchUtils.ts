@@ -207,28 +207,17 @@ function makeModule(
 // ----- Step 2 → 实验系统 -----
 
 /**
- * Step 2 fields are experiment-level metadata (实验名称, 实验类型, 实验目标).
- * These don't map to hardware/material objects directly, so we:
- *   1. Collect all non-empty text fields as attributes on a synthetic
- *      "实验概要" SystemObject (preserves all metadata without data loss).
- *   2. Map any user-added object-type fields to regular SystemObjects,
- *      using the field category name as the role.
+ * Step 2 experiment-level metadata (实验名称, 实验类型, 实验目标) is now
+ * stored directly on SciNote (experimentType, objective) and does NOT
+ * produce a synthetic SystemObject.
+ *
+ * Only user-added object-type fields are mapped to real SystemObjects.
+ * The old "实验概要" synthetic object is not generated for new notes.
+ * Legacy notes that already carry it in structuredData continue to display
+ * normally — the SystemModuleEditor renders it like any other SystemObject.
  */
 function step2ToSystemObjects(fields: ExperimentField[]): SystemObject[] {
   const objects: SystemObject[] = [];
-
-  const metaAttrs = fields
-    .filter((f) => f.type === "text" && f.value.trim())
-    .map((f) => makeTag(f.name, f.value.trim()));
-
-  if (metaAttrs.length > 0) {
-    objects.push({
-      id: generateId("sys-meta"),
-      name: "实验概要",
-      role: "实验信息",
-      attributes: metaAttrs,
-    });
-  }
 
   for (const field of fields) {
     if (field.type !== "object") continue;
