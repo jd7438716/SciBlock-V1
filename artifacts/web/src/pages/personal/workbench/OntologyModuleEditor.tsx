@@ -22,70 +22,7 @@ import { CheckCircle2, Pencil } from "lucide-react";
 import type { OntologyModule } from "@/types/workbench";
 import type { OntologyModuleStructuredData } from "@/types/ontologyModules";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
-
-import { SystemModuleEditor } from "./modules/SystemModuleEditor";
-import { PreparationModuleEditor } from "./modules/PreparationModuleEditor";
-import { OperationModuleEditor } from "./modules/OperationModuleEditor";
-import { MeasurementModuleEditor } from "./modules/MeasurementModuleEditor";
-import { DataModuleEditor } from "./modules/DataModuleEditor";
-
-// ---------------------------------------------------------------------------
-// Module content dispatcher
-// ---------------------------------------------------------------------------
-
-interface BodyProps {
-  module: OntologyModule;
-  /** Incremental updater — merges into module.structuredData and persists. */
-  onUpdate: (patch: Partial<OntologyModuleStructuredData>) => void;
-}
-
-function ModuleBody({ module, onUpdate }: BodyProps) {
-  const sd = module.structuredData ?? {};
-
-  switch (module.key) {
-    case "system":
-      return (
-        <SystemModuleEditor
-          objects={sd.systemObjects ?? []}
-          onUpdate={(objects) => onUpdate({ systemObjects: objects })}
-        />
-      );
-    case "preparation":
-      return (
-        <PreparationModuleEditor
-          items={sd.prepItems ?? []}
-          onUpdate={(items) => onUpdate({ prepItems: items })}
-        />
-      );
-    case "operation":
-      return (
-        <OperationModuleEditor
-          steps={sd.operationSteps ?? []}
-          onUpdate={(steps) => onUpdate({ operationSteps: steps })}
-        />
-      );
-    case "measurement":
-      return (
-        <MeasurementModuleEditor
-          items={sd.measurementItems ?? []}
-          onUpdate={(items) => onUpdate({ measurementItems: items })}
-        />
-      );
-    case "data":
-      return (
-        <DataModuleEditor
-          items={sd.dataItems ?? []}
-          onUpdate={(items) => onUpdate({ dataItems: items })}
-        />
-      );
-    default:
-      return (
-        <div className="px-4 py-3 text-sm text-gray-400 italic">
-          模块内容暂未配置
-        </div>
-      );
-  }
-}
+import { ModuleBodyRenderer } from "./modules/shared/ModuleBodyRenderer";
 
 // ---------------------------------------------------------------------------
 // OntologyModuleEditor
@@ -169,7 +106,7 @@ export function OntologyModuleEditor({ module }: Props) {
       {/* Body — always visible, per-item editing handled inside              */}
       {/* ------------------------------------------------------------------ */}
       <div className="flex-1 overflow-y-auto bg-gray-50">
-        <ModuleBody module={module} onUpdate={handleUpdate} />
+        <ModuleBodyRenderer module={module} onUpdate={handleUpdate} />
       </div>
 
       {/* ------------------------------------------------------------------ */}

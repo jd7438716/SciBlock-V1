@@ -1,88 +1,84 @@
-import React, { useEffect } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import { useWorkbench } from "@/contexts/WorkbenchContext";
-
 /**
- * EditorPanel — the main rich-text editing area powered by TipTap.
+ * EditorPanel — structured experiment document view (middle column).
  *
- * Responsibilities:
- *   - Initialises TipTap with StarterKit on mount
- *   - Registers an "insert at top" function with WorkbenchContext so that
- *     AI title assist and flow-draft generation can push content in
- *   - Syncs outgoing changes back to context via updateEditorContent
- *   - Shows a subtle prompt when content is empty
+ * Layer: Page-level composition component.
+ *
+ * Replaces the plain TipTap textarea with a full document-style editing area:
+ *
+ *   ┌─────────────────────────────────────────┐
+ *   │  ExperimentDocHeader                    │  read-only metadata summary
+ *   ├─────────────────────────────────────────┤
+ *   │  Scrollable body:                       │
+ *   │    ModuleSectionCard × 5               │  system/prep/op/meas/data
+ *   │    NotesSection                         │  free-form TipTap notes
+ *   └─────────────────────────────────────────┘
+ *
+ * Left-nav ↔ editor sync:
+ *   - Clicking a section header → setActiveModuleKey (updates left nav tab)
+ *   - Left nav tab change → scrolls that section into view via sectionRefs
+ *
+ * Each ModuleSectionCard:
+ *   - Is collapsible (auto-expands when active or has data)
+ *   - Delegates content rendering to ModuleBodyRenderer
+ *   - Item-level edit/save/cancel is handled by the module editor components
+ *   - Has confirm / reopen buttons (same semantics as OntologyModuleEditor)
+ *
+ * NotesSection:
+ *   - TipTap rich-text editor for free-form experiment notes
+ *   - Registers the editor-insert bridge for AI/flow-draft injection
+ *
+ * This file is intentionally thin — all business logic lives in context,
+ * all UI logic lives in the sub-components.
  */
+
+import React, { useRef, useEffect } from "react";
+import { useWorkbench } from "@/contexts/WorkbenchContext";
+import { ExperimentDocHeader } from "./editor/ExperimentDocHeader";
+import { ModuleSectionCard } from "./editor/ModuleSectionCard";
+import { NotesSection } from "./editor/NotesSection";
+import type { OntologyModuleKey } from "@/types/workbench";
+
 export function EditorPanel() {
-  const {
-    currentRecord,
-    updateEditorContent,
-    registerEditorInsert,
-    unregisterEditorInsert,
-    flowDraftInserted,
-  } = useWorkbench();
+  const { currentRecord, activeModuleKey } = useWorkbench();
 
-  const editor = useEditor({
-    extensions: [StarterKit],
-    content: currentRecord.editorContent || "",
-    onUpdate: ({ editor }) => {
-      updateEditorContent(editor.getHTML());
-    },
-    editorProps: {
-      attributes: {
-        class:
-          "prose prose-sm max-w-none outline-none min-h-[200px] px-8 py-6 text-gray-800 leading-relaxed focus:outline-none",
-      },
-    },
-  });
+  // Callback refs for each module section — used to scroll on nav change
+  const sectionRefs = useRef<Partial<Record<OntologyModuleKey, HTMLDivElement>>>({});
 
-  // When switching to a different record, reload editor content.
+  // Scroll the active module section into view when the left-nav tab changes
   useEffect(() => {
-    if (!editor) return;
-    const current = editor.getHTML();
-    if (current !== currentRecord.editorContent) {
-      editor.commands.setContent(currentRecord.editorContent || "");
+    const el = sectionRefs.current[activeModuleKey];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, [currentRecord.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Register the insert function so the context can push content in.
-  useEffect(() => {
-    if (!editor) return;
-
-    function insertAtTop(html: string) {
-      editor?.commands.insertContentAt(0, html);
-    }
-
-    registerEditorInsert(insertAtTop);
-    return () => unregisterEditorInsert();
-  }, [editor, registerEditorInsert, unregisterEditorInsert]);
-
-  const isEmpty =
-    !currentRecord.editorContent ||
-    currentRecord.editorContent === "<p></p>" ||
-    currentRecord.editorContent === "";
+  }, [activeModuleKey]);
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-gray-50 overflow-hidden">
-      {/* Toolbar placeholder — phase 2 */}
-      <div className="flex-shrink-0 border-b border-gray-100 bg-white px-4 py-1.5 flex items-center gap-1 min-h-[36px]">
-        <span className="text-xs text-gray-300">富文本工具栏（第二阶段）</span>
-        {flowDraftInserted && (
-          <span className="ml-auto text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded">
-            流程草稿已生成
-          </span>
-        )}
-      </div>
+      {/* Metadata header — fixed at top, outside the scroll area */}
+      <ExperimentDocHeader />
 
-      {/* Editor content area */}
-      <div className="flex-1 overflow-y-auto relative">
-        {isEmpty && (
-          <div className="absolute top-8 left-8 right-8 pointer-events-none text-sm text-gray-300 italic leading-relaxed">
-            在此记录实验过程…<br />
-            点击左侧"AI"图标可自动生成实验目的；确认 4 个本体模块后将自动生成流程草稿。
-          </div>
-        )}
-        <EditorContent editor={editor} />
+      {/* Scrollable document body */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-5 py-4 flex flex-col gap-3 max-w-3xl mx-auto">
+
+          {/* Module section cards */}
+          {currentRecord.currentModules.map((module) => (
+            <ModuleSectionCard
+              key={module.key}
+              module={module}
+              isActive={activeModuleKey === module.key}
+              sectionRef={(el) => {
+                if (el) sectionRefs.current[module.key] = el;
+              }}
+            />
+          ))}
+
+          {/* Free-form notes — always at the bottom */}
+          <NotesSection />
+
+          {/* Bottom padding so the last card isn't flush against the edge */}
+          <div className="h-8" />
+        </div>
       </div>
     </div>
   );
