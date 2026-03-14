@@ -5,8 +5,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import type { ExperimentField, ObjectItem } from "@/types/experimentFields";
 import { getExperimentName } from "@/types/experimentFields";
-import type { MeasurementItem } from "@/types/ontologyModules";
-import type { Step5Data } from "@/types/wizardForm";
+import type { MeasurementItem, DataItem } from "@/types/ontologyModules";
+import type { Step5Data, Step6Data } from "@/types/wizardForm";
 
 // ---------------------------------------------------------------------------
 // Read-only ObjectItem card (mirrors ObjectItemCard's visual style)
@@ -175,6 +175,57 @@ function Step5Section({ step5 }: { step5: Step5Data }) {
 }
 
 // ---------------------------------------------------------------------------
+// Step6Section — read-only view for 实验数据 (new card format)
+// Handles both new (items[]) and legacy (fields[]) step6 data.
+// ---------------------------------------------------------------------------
+
+function DataItemSummary({ item }: { item: DataItem }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-100 px-4 pt-3 pb-3 flex flex-col gap-2">
+      <p className="text-base font-semibold text-gray-800 leading-tight">
+        {item.name || "—"}
+      </p>
+      {item.attributes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {item.attributes.map((tag) => (
+            <span
+              key={tag.id}
+              className="inline-block bg-slate-100 text-slate-600 text-xs rounded-full px-2.5 py-0.5"
+            >
+              {tag.value ? `${tag.key}: ${tag.value}` : tag.key}
+            </span>
+          ))}
+        </div>
+      )}
+      {item.description && (
+        <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+      )}
+    </div>
+  );
+}
+
+function Step6Section({ step6 }: { step6: Step6Data }) {
+  // New format: items[]
+  if (step6.items && step6.items.length > 0) {
+    return (
+      <section>
+        <h2 className="text-sm font-semibold text-gray-500 mb-3">实验数据</h2>
+        <div className="flex flex-col gap-3">
+          {step6.items.map((item) => (
+            <DataItemSummary key={item.id} item={item} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  // Legacy format: fields[]
+  if (step6.fields && step6.fields.length > 0) {
+    return <StepSection title="实验数据" fields={step6.fields} />;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -230,7 +281,7 @@ export function ExperimentDetailPage() {
             <StepSection title="实验准备" fields={fd.step3.fields} />
             <StepSection title="实验操作" fields={fd.step4.fields} />
             <Step5Section step5={fd.step5} />
-            <StepSection title="实验数据" fields={fd.step6.fields} />
+            <Step6Section step6={fd.step6} />
           </>
         )}
 

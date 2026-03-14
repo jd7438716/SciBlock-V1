@@ -225,10 +225,34 @@ export const AI_MOCK_FILL: WizardFormData = {
 
   // ── Step 6 — 实验数据 (AI 只给空类别，用户填写) ─────────────────────────
   step6: {
-    fields: [
-      { id: "ai-s6-1", name: "数据项",   type: "object", value: "", items: [], objects: [] },
-      { id: "ai-s6-2", name: "结果指标", type: "object", value: "", items: [], objects: [] },
-      { id: "ai-s6-3", name: "观察记录", type: "list",   value: "", items: [], objects: [] },
+    items: [
+      {
+        id: "ai-s6-1",
+        name: "XRD 衍射峰位置与强度",
+        attributes: [
+          { key: "衍射角范围", value: "20°–80°" },
+          { key: "峰值", value: "(002) 34.4°" },
+        ],
+        description: "用于确认 ZnO 薄膜的 c 轴择优取向及结晶质量",
+      },
+      {
+        id: "ai-s6-2",
+        name: "薄膜方块电阻",
+        attributes: [
+          { key: "测量方法", value: "四探针法" },
+          { key: "单位", value: "Ω/□" },
+        ],
+        description: "评估不同退火温度下 ZnO 导电性的变化趋势",
+      },
+      {
+        id: "ai-s6-3",
+        name: "薄膜表面形貌",
+        attributes: [
+          { key: "表征手段", value: "SEM" },
+          { key: "放大倍率", value: "50k×" },
+        ],
+        description: "观察晶粒尺寸与表面粗糙度随退火温度的演变",
+      },
     ],
   },
 };

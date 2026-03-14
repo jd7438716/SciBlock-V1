@@ -5,7 +5,6 @@ import {
   DEFAULT_STEP2_FIELDS,
   DEFAULT_STEP3_FIELDS,
   DEFAULT_STEP4_FIELDS,
-  DEFAULT_STEP6_FIELDS,
 } from "@/data/defaultStepFields";
 
 const INITIAL: WizardFormData = {
@@ -14,7 +13,8 @@ const INITIAL: WizardFormData = {
   step4: { fields: DEFAULT_STEP4_FIELDS },
   // Step 5 uses the per-event card model — starts empty, written only to items[].
   step5: { items: [] },
-  step6: { fields: DEFAULT_STEP6_FIELDS },
+  // Step 6 uses the DataItem card model — starts empty, written only to items[].
+  step6: { items: [] },
 };
 
 export interface UseWizardFormResult {

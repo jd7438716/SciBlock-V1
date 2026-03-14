@@ -418,14 +418,16 @@ function step5ToMeasurementItems(step5: { items?: MeasurementItem[]; fields?: Ex
 // ----- Step 6 → 实验数据 -----
 
 /**
- * object fields: each ObjectItem → DataItem (name + attributes)
- * list fields:   each string   → DataItem (name only, description = field name)
- * text fields:   the value     → DataItem (name only)
+ * Legacy fallback — only used when a note still carries the old
+ * Step6Data.fields format (three field groups: 数据项 / 结果指标 / 观察记录).
  *
- * For items from a non-default field (e.g. "结果指标"), the field name is
- * stored in DataItem.description so the semantic origin is preserved.
+ * This is a best-effort mapping.  The original formData is always preserved
+ * on SciNote so no data is lost even if the mapping is imperfect.
+ *
+ * This function will never be called for notes created after the Step 6
+ * refactor — those notes carry items[] and go through the passthrough path.
  */
-function step6ToDataItems(fields: ExperimentField[]): DataItem[] {
+function step6ToDataItemsLegacy(fields: ExperimentField[]): DataItem[] {
   const items: DataItem[] = [];
 
   for (const field of fields) {
@@ -462,6 +464,27 @@ function step6ToDataItems(fields: ExperimentField[]): DataItem[] {
   return items;
 }
 
+/**
+ * step6ToDataItems — dispatch between the two Step6Data formats.
+ *
+ * New format (items[]): direct passthrough — 1:1 fidelity, zero conversion.
+ *   DataItem is the wizard type; it passes directly to the workbench module.
+ *   description is user-provided "备注/说明" text, preserved verbatim.
+ *
+ * Legacy format (fields[]): best-effort mapping via the legacy function above.
+ *
+ * The check is ordered: if items is present and non-empty, it always wins.
+ */
+function step6ToDataItems(step6: { items?: DataItem[]; fields?: ExperimentField[] }): DataItem[] {
+  if (step6.items && step6.items.length > 0) {
+    return step6.items;
+  }
+  if (step6.fields && step6.fields.length > 0) {
+    return step6ToDataItemsLegacy(step6.fields);
+  }
+  return [];
+}
+
 // ----- Public entry point -----
 
 /**
@@ -472,8 +495,8 @@ function step6ToDataItems(fields: ExperimentField[]): DataItem[] {
  *   Step 2 → 实验系统   metadata as "实验概要" SystemObject + any object fields
  *   Step 3 → 实验准备   object/list/text fields → PrepItem[] (field name = category)
  *   Step 4 → 实验操作   object/list/text fields → OperationStep[] (sequential order)
- *   Step 5 → 测量过程   best-effort; each ObjectItem → MeasurementItem (TODO: full map)
- *   Step 6 → 实验数据   object/list/text fields → DataItem[]
+ *   Step 5 → 测量过程   new: direct passthrough (items[]); legacy: best-effort from fields[]
+ *   Step 6 → 实验数据   new: direct passthrough (items[]); legacy: best-effort from fields[]
  *
  * Called once per SciNote on first workbench visit. Never mutates its input.
  * Replace DEFAULT_ONTOLOGY_VERSION fallback with the result of this function
@@ -481,10 +504,10 @@ function step6ToDataItems(fields: ExperimentField[]): DataItem[] {
  */
 export function wizardToModules(formData: WizardFormData): OntologyModule[] {
   return [
-    makeModule("system",      "实验系统", { systemObjects:    step2ToSystemObjects(formData.step2.fields) }),
-    makeModule("preparation", "实验准备", { prepItems:        step3ToPrepItems(formData.step3.fields)    }),
-    makeModule("operation",   "实验操作", { operationSteps:   step4ToOperationSteps(formData.step4.fields) }),
-    makeModule("measurement", "测量过程", { measurementItems: step5ToMeasurementItems(formData.step5) }),
-    makeModule("data",        "实验数据", { dataItems:        step6ToDataItems(formData.step6.fields)    }),
+    makeModule("system",      "实验系统", { systemObjects:    step2ToSystemObjects(formData.step2.fields)   }),
+    makeModule("preparation", "实验准备", { prepItems:        step3ToPrepItems(formData.step3.fields)       }),
+    makeModule("operation",   "实验操作", { operationSteps:   step4ToOperationSteps(formData.step4.fields)  }),
+    makeModule("measurement", "测量过程", { measurementItems: step5ToMeasurementItems(formData.step5)       }),
+    makeModule("data",        "实验数据", { dataItems:        step6ToDataItems(formData.step6)              }),
   ];
 }
