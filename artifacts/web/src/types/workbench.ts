@@ -14,7 +14,14 @@ export type OntologyModuleStatus = "inherited" | "editing" | "confirmed";
 export interface OntologyModule {
   key: OntologyModuleKey;
   title: string;
+  /** Flat text representation — used by the editing textarea. */
   content: string;
+  /**
+   * Structured domain entities for this module.
+   * Used by the card-style view components (inherited / confirmed states).
+   * Undefined on legacy records that predate structured data.
+   */
+  structuredData?: import("./ontologyModules").OntologyModuleStructuredData;
   status: OntologyModuleStatus;
   isHighlighted: boolean;
   updatedAt: string;

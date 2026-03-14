@@ -2,6 +2,69 @@ import React, { useState, useEffect } from "react";
 import { CheckCircle2, Pencil } from "lucide-react";
 import type { OntologyModule } from "@/types/workbench";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
+import { SystemModuleView } from "./modules/SystemModuleView";
+import { PreparationModuleView } from "./modules/PreparationModuleView";
+import { OperationModuleView } from "./modules/OperationModuleView";
+import { MeasurementModuleView } from "./modules/MeasurementModuleView";
+import { DataModuleView } from "./modules/DataModuleView";
+
+// ---------------------------------------------------------------------------
+// Structured content dispatcher
+// ---------------------------------------------------------------------------
+
+/**
+ * StructuredModuleView — selects the correct view component based on module key.
+ * Rendered in inherited / confirmed states.
+ * Falls back to a plain pre-wrap text block when structuredData is absent
+ * (e.g. legacy records created before structured data was introduced).
+ */
+function StructuredModuleView({
+  module,
+  onAdd,
+}: {
+  module: OntologyModule;
+  onAdd: () => void;
+}) {
+  const sd = module.structuredData;
+
+  if (module.key === "system") {
+    const objects = sd?.systemObjects ?? [];
+    return <SystemModuleView objects={objects} onAdd={onAdd} />;
+  }
+
+  if (module.key === "preparation") {
+    const items = sd?.prepItems ?? [];
+    return <PreparationModuleView items={items} onAdd={onAdd} />;
+  }
+
+  if (module.key === "operation") {
+    const steps = sd?.operationSteps ?? [];
+    return <OperationModuleView steps={steps} onAdd={onAdd} />;
+  }
+
+  if (module.key === "measurement") {
+    const items = sd?.measurementItems ?? [];
+    return <MeasurementModuleView items={items} onAdd={onAdd} />;
+  }
+
+  if (module.key === "data") {
+    const items = sd?.dataItems ?? [];
+    return <DataModuleView items={items} onAdd={onAdd} />;
+  }
+
+  // Fallback — should not reach here with a valid key
+  return (
+    <div className="px-4 py-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+      {module.content || (
+        <span className="text-gray-300 italic">暂无内容，点击"编辑"填写</span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OntologyModuleEditor
+// ---------------------------------------------------------------------------
 
 interface Props {
   module: OntologyModule;
@@ -16,6 +79,9 @@ interface Props {
  *   editing   → confirmed  (保存编辑内容并确认)
  *   editing   → inherited  (取消，内容恢复)
  *   confirmed → editing    (再次编辑，状态回到 editing)
+ *
+ * View states (inherited / confirmed) now render structured card/list panels
+ * via StructuredModuleView. The editing state retains a plain textarea.
  *
  * Highlight: isHighlighted=true → faint amber ring (AI flagged this module)
  */
@@ -43,7 +109,6 @@ export function OntologyModuleEditor({ module }: Props) {
   }
 
   function handleDirectConfirm() {
-    // Confirm the inherited content without modification
     setModuleStatus(module.key, "confirmed");
   }
 
@@ -133,28 +198,26 @@ export function OntologyModuleEditor({ module }: Props) {
       {/* ------------------------------------------------------------------ */}
       {/* Content                                                             */}
       {/* ------------------------------------------------------------------ */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className={[
+          "flex-1 overflow-y-auto",
+          isEditing   ? "bg-amber-50" : "",
+          isConfirmed ? "bg-white"    : "",
+          isInherited ? "bg-gray-50"  : "",
+        ].join(" ")}
+      >
         {isEditing ? (
+          /* Editing state: plain textarea (fast, reliable, accepts any format) */
           <textarea
             value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-            }}
+            onChange={(e) => setDraft(e.target.value)}
             className="w-full h-full min-h-[200px] px-4 py-3 text-sm text-gray-700 leading-relaxed resize-none outline-none bg-amber-50 border-0 font-mono"
             placeholder="输入模块内容…"
             autoFocus
           />
         ) : (
-          <div
-            className={[
-              "px-4 py-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap h-full",
-              isConfirmed ? "bg-white" : "bg-gray-50",
-            ].join(" ")}
-          >
-            {module.content || (
-              <span className="text-gray-300 italic">暂无内容，点击"编辑"填写</span>
-            )}
-          </div>
+          /* View state (inherited / confirmed): structured card / list panel */
+          <StructuredModuleView module={module} onAdd={handleEditClick} />
         )}
       </div>
 
