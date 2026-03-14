@@ -58,39 +58,57 @@ interface Props {
  * replace the onChange call inside handleFiles with an async upload + URL
  * resolution step and set `att.url` to the returned permanent URL.
  */
+/** Convert a File to a base64 data URL. Resolves in-memory — no server needed. */
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export function AttachmentArea({ attachments, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleFiles(files: FileList | null) {
+  /**
+   * Convert files to data URLs (base64) so the preview survives
+   * localStorage serialisation and page refreshes.
+   *
+   * Strategy:
+   *   image / document → data URL  (persists across refresh, works in iframe)
+   *   video            → blob URL  (data URLs are too large for localStorage;
+   *                                  accepted limitation: in-session only)
+   *
+   * When real upload infra lands, replace this with async upload → server URL.
+   */
+  async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
 
     const newItems: AttachmentMeta[] = [];
     for (const file of Array.from(files)) {
       const type = detectType(file);
-      // All file types get a blob URL so they can be opened locally:
-      //   image   → lightbox preview
-      //   video   → window.open → browser native video player
-      //   pdf     → window.open → browser PDF viewer
-      //   other   → window.open → browser downloads (no server needed)
-      // When real upload infra lands, replace this with the returned server URL.
+      const localPreviewUrl =
+        type === "video"
+          ? URL.createObjectURL(file)          // blob — large videos can't be base64'd in localStorage
+          : await readFileAsDataUrl(file);     // data URL — persists across page refresh
       newItems.push({
         id: makeId(),
         name: file.name,
         type,
-        localPreviewUrl: URL.createObjectURL(file),
+        localPreviewUrl,
         size: file.size,
         uploadedAt: new Date().toISOString(),
       });
     }
 
     onChange([...attachments, ...newItems]);
-    // Reset input so the same file can be re-selected if needed
     if (inputRef.current) inputRef.current.value = "";
   }
 
   function remove(att: AttachmentMeta) {
-    // Revoke blob URL to free memory
-    if (att.localPreviewUrl) {
+    // Only blob URLs need explicit revocation; data URLs are plain strings
+    if (att.localPreviewUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(att.localPreviewUrl);
     }
     onChange(attachments.filter((a) => a.id !== att.id));

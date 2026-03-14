@@ -135,19 +135,25 @@ interface Props {
 
 export function AttachmentViewStrip({ attachments }: Props) {
   const [expanded, setExpanded] = useState(false);
+  // Image lightbox
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxName, setLightboxName] = useState<string>("");
-  // Brief "no URL" feedback shown when user double-clicks a doc/video without a server URL
+  // Document/PDF in-app viewer
+  const [docViewerSrc, setDocViewerSrc] = useState<string | null>(null);
+  const [docViewerName, setDocViewerName] = useState<string>("");
+  // Brief feedback when a video has no URL at all
   const [noUrlFeedback, setNoUrlFeedback] = useState(false);
 
   if (attachments.length === 0) return null;
 
   function openLightbox(att: AttachmentMeta) {
     const src = att.localPreviewUrl ?? att.url;
-    if (src) {
-      setLightboxSrc(src);
-      setLightboxName(att.name);
-    }
+    if (src) { setLightboxSrc(src); setLightboxName(att.name); }
+  }
+
+  function openDocViewer(att: AttachmentMeta) {
+    const src = att.url ?? att.localPreviewUrl;
+    if (src) { setDocViewerSrc(src); setDocViewerName(att.name); }
   }
 
   function openExternal(att: AttachmentMeta) {
@@ -160,15 +166,18 @@ export function AttachmentViewStrip({ attachments }: Props) {
   }
 
   /**
-   * Double-click on any attachment row opens the attachment directly.
-   *   image            → lightbox (uses localPreviewUrl or url)
-   *   video / document → window.open(url) in new tab
-   *                      if no URL available → brief inline feedback
+   * Double-click any row to open the attachment:
+   *   image    → in-app lightbox  (data URL — survives refresh)
+   *   document → in-app iframe overlay with close button  (data URL — survives refresh)
+   *   video    → new tab  (blob URL — in-session only, data URL too large)
    */
   function handleDoubleClick(att: AttachmentMeta) {
     if (att.type === "image") {
       openLightbox(att);
+    } else if (att.type === "document") {
+      openDocViewer(att);
     } else {
+      // video
       const target = att.url ?? att.localPreviewUrl;
       if (target) {
         window.open(target, "_blank", "noopener,noreferrer");
@@ -259,7 +268,7 @@ export function AttachmentViewStrip({ attachments }: Props) {
                   </div>
                 </div>
 
-                {/* Action button: preview for images, open-external for docs/videos */}
+                {/* Action button: type-specific open action */}
                 {att.type === "image" ? (
                   <button
                     type="button"
@@ -270,13 +279,24 @@ export function AttachmentViewStrip({ attachments }: Props) {
                   >
                     <ExternalLink size={12} />
                   </button>
+                ) : att.type === "document" ? (
+                  <button
+                    type="button"
+                    onClick={() => openDocViewer(att)}
+                    disabled={!preview}
+                    className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-30 p-0.5 rounded"
+                    title={preview ? "预览文档" : "接入文件服务后可预览"}
+                  >
+                    <ExternalLink size={12} />
+                  </button>
                 ) : (
+                  // video → new tab
                   <button
                     type="button"
                     onClick={() => openExternal(att)}
                     disabled={!preview}
                     className="flex-shrink-0 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-30 p-0.5 rounded"
-                    title={preview ? "在新标签页打开" : "接入文件服务后可预览"}
+                    title={preview ? "在新标签页打开视频" : "接入文件服务后可预览"}
                   >
                     <ExternalLink size={12} />
                   </button>
@@ -302,6 +322,48 @@ export function AttachmentViewStrip({ attachments }: Props) {
           name={lightboxName}
           onClose={() => setLightboxSrc(null)}
         />
+      )}
+
+      {/* ── Document / PDF in-app viewer overlay ── */}
+      {docViewerSrc && (
+        <div
+          className="fixed inset-0 z-[999] bg-black/80 flex items-center justify-center"
+          onClick={() => setDocViewerSrc(null)}
+        >
+          <div
+            className="relative w-[90vw] h-[90vh] bg-white rounded-lg overflow-hidden shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top bar: file name + buttons */}
+            <div className="flex-shrink-0 h-10 bg-gray-800 flex items-center justify-between px-3 gap-3">
+              <span className="text-sm text-white truncate">{docViewerName}</span>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => window.open(docViewerSrc, "_blank", "noopener,noreferrer")}
+                  className="text-gray-300 hover:text-white transition-colors p-1 rounded"
+                  title="在新标签页打开"
+                >
+                  <ExternalLink size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDocViewerSrc(null)}
+                  className="text-gray-300 hover:text-white transition-colors p-1 rounded"
+                  title="关闭"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            {/* iframe — browser renders PDF natively; other types trigger download */}
+            <iframe
+              src={docViewerSrc}
+              className="flex-1 w-full border-none"
+              title={docViewerName}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
