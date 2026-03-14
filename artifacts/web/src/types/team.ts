@@ -8,14 +8,22 @@
 // Enums
 // ---------------------------------------------------------------------------
 
-export type StudentDegree = "bachelor" | "master" | "phd";
+export type StudentDegree = "bachelor" | "master" | "phd" | "joint";
 export type StudentStatus = "active" | "pending" | "graduated";
 
 export const DEGREE_LABELS: Record<StudentDegree, string> = {
   bachelor: "本科",
   master:   "硕士",
   phd:      "博士",
+  joint:    "联培",
 };
+
+export const DEGREE_OPTIONS: { value: StudentDegree; label: string }[] = [
+  { value: "master",   label: "硕士" },
+  { value: "phd",      label: "博士" },
+  { value: "joint",    label: "联培" },
+  { value: "bachelor", label: "本科" },
+];
 
 export const STATUS_LABELS: Record<StudentStatus, string> = {
   active:    "在读",
