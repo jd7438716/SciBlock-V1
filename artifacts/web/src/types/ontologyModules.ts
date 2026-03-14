@@ -17,21 +17,14 @@ export type { Tag };
 export type AttachmentType = "image" | "video" | "document";
 
 /**
- * User-assigned label for an uploaded attachment.
+ * User-assigned quality status for an uploaded attachment.
  *
- * Quality group (质量评估):
- *   合格   → green
- *   不合格  → red
- *   待确认  → yellow
- *
- * State group (状态评估):
- *   完成   → blue
- *   待确认  → yellow  (shared value with quality group)
- *   异常   → orange
- *
- *   undefined → no label selected
+ *   合格   → green   (acceptable result)
+ *   不合格  → red     (unacceptable result)
+ *   待确认  → yellow  (pending review)
+ *   undefined → not yet labelled
  */
-export type AttachmentStatus = "合格" | "不合格" | "待确认" | "完成" | "异常";
+export type AttachmentStatus = "合格" | "不合格" | "待确认";
 
 export interface AttachmentMeta {
   id: string;
