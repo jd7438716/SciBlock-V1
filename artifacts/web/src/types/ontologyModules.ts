@@ -52,11 +52,8 @@ export interface PrepItem {
   name: string;
   /** Category label (e.g. "基底清洗" | "表面活化" | "靶材处理") */
   category: string;
-  /** Quantity / specification (e.g. "20 mL, 分析纯") */
-  spec?: string;
-  /** Pre-treatment method (e.g. "超声 15 min") */
-  treatment?: string;
-  duration?: string;
+  /** Structured key:value attributes (e.g. [{key:"用量", value:"20 mL"}, {key:"纯度", value:"AR"}]) */
+  attributes: Tag[];
   description?: string;
   attachments?: AttachmentMeta[];
 }
@@ -69,7 +66,8 @@ export interface OperationStep {
   id: string;
   order: number;
   name: string;
-  params?: string;
+  /** Structured key:value parameter tags (e.g. [{key:"温度", value:"80 ℃"}, {key:"时间", value:"30 min"}]) */
+  params: Tag[];
   notes?: string;
   attachments?: AttachmentMeta[];
 }
@@ -84,7 +82,8 @@ export interface MeasurementItem {
   instrument?: string;
   method?: string;
   target: string;
-  conditions?: string;
+  /** Structured key:value condition tags (e.g. [{key:"波长", value:"664 nm"}, {key:"扫描范围", value:"200–800 nm"}]) */
+  conditions: Tag[];
   attachments?: AttachmentMeta[];
 }
 
@@ -95,7 +94,8 @@ export interface MeasurementItem {
 export interface DataItem {
   id: string;
   name: string;
-  unit?: string;
+  /** Structured key:value attributes (e.g. [{key:"单位", value:"mg/L"}, {key:"数据类型", value:"吸光度"}]) */
+  attributes: Tag[];
   description?: string;
   attachments?: AttachmentMeta[];
 }

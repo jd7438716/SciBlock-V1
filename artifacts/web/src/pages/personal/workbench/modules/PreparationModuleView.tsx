@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import type { PrepItem } from "@/types/ontologyModules";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 interface Props {
   items: PrepItem[];
@@ -42,15 +43,11 @@ export function PreparationModuleView({ items, onAdd }: Props) {
           </span>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-gray-800">{item.name}</span>
-              {item.duration && (
-                <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">
-                  {item.duration}
-                </span>
-              )}
-            </div>
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-800">{item.name}</span>
+            {(item.attributes?.length ?? 0) > 0 && (
+              <AttributeTagRow tags={item.attributes ?? []} onChange={() => {}} />
+            )}
             {item.description && (
               <p className="text-xs text-gray-400 leading-relaxed">{item.description}</p>
             )}

@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import type { DataItem } from "@/types/ontologyModules";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 interface Props {
   items: DataItem[];
@@ -26,16 +27,15 @@ export function DataModuleView({ items, onAdd }: Props) {
           key={item.id}
           className="flex items-start gap-3 rounded-lg border border-gray-100 bg-white px-3 py-2 shadow-sm"
         >
-          {/* Name + unit */}
-          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-gray-800">{item.name}</span>
-              {item.unit && (
-                <span className="text-[11px] font-mono bg-gray-100 text-gray-500 rounded px-1.5 py-0.5 border border-gray-200">
-                  {item.unit}
-                </span>
-              )}
-            </div>
+          {/* Name + attributes */}
+          <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <span className="text-sm font-medium text-gray-800">{item.name}</span>
+            {(item.attributes?.length ?? 0) > 0 && (
+              <AttributeTagRow
+                tags={item.attributes ?? []}
+                onChange={() => {}}
+              />
+            )}
             {item.description && (
               <p className="text-xs text-gray-400 leading-relaxed">{item.description}</p>
             )}

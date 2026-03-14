@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import type { OperationStep } from "@/types/ontologyModules";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 interface Props {
   steps: OperationStep[];
@@ -39,10 +40,8 @@ export function OperationModuleView({ steps, onAdd }: Props) {
                 <span className="text-sm font-medium text-gray-800 leading-snug">
                   {step.name}
                 </span>
-                {step.params && (
-                  <span className="text-[11px] font-mono text-gray-500 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 w-fit">
-                    {step.params}
-                  </span>
+                {(step.params?.length ?? 0) > 0 && (
+                  <AttributeTagRow tags={step.params ?? []} onChange={() => {}} />
                 )}
                 {step.notes && (
                   <p className="text-xs text-gray-400 leading-relaxed">{step.notes}</p>

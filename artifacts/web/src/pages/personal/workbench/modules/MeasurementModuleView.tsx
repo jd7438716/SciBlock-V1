@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import type { MeasurementItem } from "@/types/ontologyModules";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 interface Props {
   items: MeasurementItem[];
@@ -50,12 +51,9 @@ export function MeasurementModuleView({ items, onAdd }: Props) {
             </div>
           )}
 
-          {/* Conditions */}
-          {item.conditions && (
-            <div className="flex gap-1.5 items-center">
-              <span className="text-[10px] font-medium text-gray-400">条件</span>
-              <span className="text-[11px] text-gray-400">{item.conditions}</span>
-            </div>
+          {/* Conditions — key:value tag chips (read-only in view state) */}
+          {(item.conditions?.length ?? 0) > 0 && (
+            <AttributeTagRow tags={item.conditions ?? []} onChange={() => {}} />
           )}
         </div>
       ))}

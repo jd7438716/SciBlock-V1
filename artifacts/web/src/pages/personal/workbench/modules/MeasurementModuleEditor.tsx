@@ -1,20 +1,20 @@
 /**
  * MeasurementModuleEditor — per-item inline editing for the 测量过程 module.
  *
- * Same architecture as SystemModuleEditor / OperationModuleEditor:
- *  - Per-item view | editing | creating state.
- *  - VIEW card: click name or pencil → enters edit for that item.
- *  - EDIT card: full form with per-item save ✓ and cancel ✗.
- *  - Saves go directly to onUpdate — no module-level draft.
+ * Aligned with SystemModuleEditor:
+ *  - conditions: Tag[] — structured key:value condition tags (replaces plain string)
+ *  - VIEW card: name + instrument badge + method + AttributeTagRow (direct edit)
+ *  - EDIT card: name, instrument, method, target textarea, AttributeTagRow, attachments
  */
 
 import React, { useState } from "react";
 import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { MeasurementItem, AttachmentMeta } from "@/types/ontologyModules";
+import type { MeasurementItem } from "@/types/ontologyModules";
 import { ItemField } from "./shared/ItemField";
 import { AttachmentArea } from "./shared/AttachmentArea";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,7 +25,7 @@ function makeId(): string {
 }
 
 function makeBlankMeasurement(): MeasurementItem {
-  return { id: makeId(), name: "", target: "", attachments: [] };
+  return { id: makeId(), name: "", target: "", conditions: [], attachments: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,12 +101,12 @@ function MeasurementItemEditCard({ draft, onChange, onSave, onCancel }: EditCard
           <Input
             value={draft.method ?? ""}
             onChange={(e) => set("method", e.target.value)}
-            placeholder="如：θ-2θ 扫描 (10°–80°)"
-            className="h-8 text-sm font-mono"
+            placeholder="如：Cu Kα辐射，θ-2θ 扫描"
+            className="h-8 text-sm"
           />
         </ItemField>
 
-        <ItemField label="测量目标" required hint="本测量旨在确定什么">
+        <ItemField label="测量目标" hint="本测量旨在确定什么">
           <Textarea
             value={draft.target}
             onChange={(e) => set("target", e.target.value)}
@@ -116,12 +116,12 @@ function MeasurementItemEditCard({ draft, onChange, onSave, onCancel }: EditCard
           />
         </ItemField>
 
-        <ItemField label="测量条件">
-          <Input
-            value={draft.conditions ?? ""}
-            onChange={(e) => set("conditions", e.target.value)}
-            placeholder="如：室温，步长 0.01°，速度 2°/min"
-            className="h-8 text-sm"
+        <ItemField label="测量条件" hint="点击标签修改；回车确认">
+          <AttributeTagRow
+            tags={draft.conditions}
+            onChange={(tags) => set("conditions", tags)}
+            keyPlaceholder="条件名"
+            valuePlaceholder="值"
           />
         </ItemField>
 
@@ -142,9 +142,10 @@ interface ViewCardProps {
   item: MeasurementItem;
   onEdit: () => void;
   onDelete: () => void;
+  onUpdate: (updated: MeasurementItem) => void;
 }
 
-function MeasurementItemViewCard({ item, onEdit, onDelete }: ViewCardProps) {
+function MeasurementItemViewCard({ item, onEdit, onDelete, onUpdate }: ViewCardProps) {
   return (
     <div className="bg-white border border-gray-100 rounded-lg shadow-sm px-3 py-2.5 flex flex-col gap-1.5 group">
       {/* Name + instrument */}
@@ -179,17 +180,20 @@ function MeasurementItemViewCard({ item, onEdit, onDelete }: ViewCardProps) {
         <p className="text-xs text-gray-600 leading-relaxed">{item.target}</p>
       )}
 
-      {/* Method + conditions */}
-      <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-        {item.method && (
-          <span className="text-[11px] font-mono text-gray-400 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5">
-            {item.method}
-          </span>
-        )}
-        {item.conditions && (
-          <span className="text-[11px] text-gray-400">{item.conditions}</span>
-        )}
-      </div>
+      {/* Method */}
+      {item.method && (
+        <span className="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 w-fit">
+          {item.method}
+        </span>
+      )}
+
+      {/* Conditions — direct key:value tag edit */}
+      <AttributeTagRow
+        tags={item.conditions}
+        onChange={(tags) => onUpdate({ ...item, conditions: tags })}
+        keyPlaceholder="条件名"
+        valuePlaceholder="值"
+      />
 
       {(item.attachments?.length ?? 0) > 0 && (
         <span className="text-[10px] text-gray-300">{item.attachments!.length} 个附件</span>
@@ -215,7 +219,7 @@ export function MeasurementModuleEditor({ items, onUpdate }: EditorProps) {
   function startEdit(item: MeasurementItem) {
     setPendingNew(null);
     setEditingId(item.id);
-    setEditDraft({ ...item });
+    setEditDraft({ ...item, conditions: [...(item.conditions ?? [])] });
   }
 
   function saveEdit() {
@@ -251,6 +255,10 @@ export function MeasurementModuleEditor({ items, onUpdate }: EditorProps) {
     onUpdate(items.filter((m) => m.id !== id));
   }
 
+  function updateItemDirect(id: string, updated: MeasurementItem) {
+    onUpdate(items.map((m) => (m.id === id ? updated : m)));
+  }
+
   return (
     <div className="flex flex-col gap-2.5 px-4 py-3">
       {items.length === 0 && !pendingNew && (
@@ -274,6 +282,7 @@ export function MeasurementModuleEditor({ items, onUpdate }: EditorProps) {
             item={item}
             onEdit={() => startEdit(item)}
             onDelete={() => deleteItem(item.id)}
+            onUpdate={(updated) => updateItemDirect(item.id, updated)}
           />
         ),
       )}

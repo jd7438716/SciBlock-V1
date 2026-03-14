@@ -1,19 +1,20 @@
 /**
  * PreparationModuleEditor — per-item inline editing for the 实验准备 module.
  *
- * Same architecture as the other three priority editors. Replaces the
- * legacy textarea fallback so all 4 structured modules are consistent.
- *
- * Fields per PrepItem: 名称, 分类, 用量/规格, 处理方式, 时长, 备注, 附件.
+ * Aligned with SystemModuleEditor:
+ *  - VIEW card: category badge + name (click-to-edit) + AttributeTagRow (direct edit)
+ *  - EDIT card: name, category pills, AttributeTagRow, description, attachments
+ *  - attributes: Tag[] — same key:value structure as 实验系统
  */
 
 import React, { useState } from "react";
 import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { PrepItem, AttachmentMeta } from "@/types/ontologyModules";
+import type { PrepItem } from "@/types/ontologyModules";
 import { ItemField } from "./shared/ItemField";
 import { AttachmentArea } from "./shared/AttachmentArea";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -37,7 +38,7 @@ function makeId(): string {
 }
 
 function makeBlankPrepItem(): PrepItem {
-  return { id: makeId(), name: "", category: "基底清洗", attachments: [] };
+  return { id: makeId(), name: "", category: "基底清洗", attributes: [], attachments: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +87,6 @@ function PrepItemEditCard({ draft, onChange, onSave, onCancel }: EditCardProps) 
 
       {/* Body */}
       <div className="px-4 py-3 flex flex-col gap-3">
-        {/* Name */}
         <ItemField label="名称" required>
           <Input
             autoFocus
@@ -98,7 +98,6 @@ function PrepItemEditCard({ draft, onChange, onSave, onCancel }: EditCardProps) 
           />
         </ItemField>
 
-        {/* Category */}
         <ItemField label="分类">
           <div className="flex flex-wrap gap-1.5">
             {CATEGORY_OPTIONS.map((cat) => (
@@ -119,37 +118,15 @@ function PrepItemEditCard({ draft, onChange, onSave, onCancel }: EditCardProps) 
           </div>
         </ItemField>
 
-        {/* Spec */}
-        <ItemField label="用量 / 规格" hint="如：20 mL、分析纯、99.99%">
-          <Input
-            value={draft.spec ?? ""}
-            onChange={(e) => set("spec", e.target.value)}
-            placeholder="如：分析纯丙酮 20 mL"
-            className="h-8 text-sm"
+        <ItemField label="属性参数" hint="点击标签修改；回车确认">
+          <AttributeTagRow
+            tags={draft.attributes}
+            onChange={(tags) => set("attributes", tags)}
+            keyPlaceholder="参数名"
+            valuePlaceholder="值"
           />
         </ItemField>
 
-        {/* Treatment */}
-        <ItemField label="处理方式" hint="如：超声 15 min、等离子活化">
-          <Input
-            value={draft.treatment ?? ""}
-            onChange={(e) => set("treatment", e.target.value)}
-            placeholder="如：超声 15 min，氮气吹干"
-            className="h-8 text-sm"
-          />
-        </ItemField>
-
-        {/* Duration */}
-        <ItemField label="时长">
-          <Input
-            value={draft.duration ?? ""}
-            onChange={(e) => set("duration", e.target.value)}
-            placeholder="如：15 min、30 s"
-            className="h-8 text-sm"
-          />
-        </ItemField>
-
-        {/* Notes */}
         <ItemField label="备注">
           <Textarea
             value={draft.description ?? ""}
@@ -177,68 +154,72 @@ interface ViewCardProps {
   item: PrepItem;
   onEdit: () => void;
   onDelete: () => void;
+  onUpdate: (updated: PrepItem) => void;
 }
 
-function PrepItemViewCard({ item, onEdit, onDelete }: ViewCardProps) {
+function PrepItemViewCard({ item, onEdit, onDelete, onUpdate }: ViewCardProps) {
   const catColor = CATEGORY_COLORS[item.category] ?? "bg-gray-100 text-gray-500 border-gray-200";
 
   return (
-    <div className="flex items-start gap-3 bg-white border border-gray-100 rounded-lg shadow-sm px-3 py-2 group">
-      {/* Category badge */}
-      <button
-        type="button"
-        onClick={onEdit}
-        className={[
-          "flex-shrink-0 mt-0.5 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap hover:opacity-70 transition-opacity",
-          catColor,
-        ].join(" ")}
-        title="点击编辑"
-      >
-        {item.category}
-      </button>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+    <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
+      {/* Header row: category badge + name + actions */}
+      <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
           onClick={onEdit}
-          className="text-sm font-medium text-gray-800 text-left hover:text-blue-700 transition-colors leading-snug"
+          className={[
+            "flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap hover:opacity-70 transition-opacity",
+            catColor,
+          ].join(" ")}
+          title="点击编辑"
+        >
+          {item.category}
+        </button>
+
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex-1 text-sm font-medium text-gray-800 text-left hover:text-blue-700 transition-colors leading-snug min-w-0 truncate"
           title="点击编辑"
         >
           {item.name || <span className="text-gray-300 font-normal italic">未命名准备项</span>}
         </button>
 
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 items-center">
-          {item.spec && (
-            <span className="text-[11px] text-gray-500">{item.spec}</span>
-          )}
-          {item.treatment && (
-            <span className="text-[11px] text-gray-400">{item.treatment}</span>
-          )}
-          {item.duration && (
-            <span className="text-[11px] bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">
-              {item.duration}
-            </span>
-          )}
+        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button type="button" onClick={onEdit} className="p-1 rounded text-gray-400 hover:text-gray-700 transition-colors" title="编辑">
+            <Pencil size={11} />
+          </button>
+          <button type="button" onClick={onDelete} className="p-1 rounded text-gray-400 hover:text-red-500 transition-colors" title="删除">
+            <Trash2 size={11} />
+          </button>
         </div>
-
-        {item.description && (
-          <p className="text-xs text-gray-400 leading-relaxed">{item.description}</p>
-        )}
-        {(item.attachments?.length ?? 0) > 0 && (
-          <span className="text-[10px] text-gray-300">{item.attachments!.length} 个附件</span>
-        )}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button type="button" onClick={onEdit} className="p-1 rounded text-gray-400 hover:text-gray-700 transition-colors" title="编辑">
-          <Pencil size={11} />
-        </button>
-        <button type="button" onClick={onDelete} className="p-1 rounded text-gray-400 hover:text-red-500 transition-colors" title="删除">
-          <Trash2 size={11} />
-        </button>
+      {/* Attributes — direct inline edit without entering full edit mode */}
+      <div className="px-3 pb-2">
+        <AttributeTagRow
+          tags={item.attributes}
+          onChange={(tags) => onUpdate({ ...item, attributes: tags })}
+          keyPlaceholder="参数名"
+          valuePlaceholder="值"
+        />
       </div>
+
+      {item.description && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="px-3 pb-2.5 text-xs text-gray-400 leading-relaxed text-left hover:text-gray-600 transition-colors w-full"
+        >
+          {item.description}
+        </button>
+      )}
+
+      {(item.attachments?.length ?? 0) > 0 && (
+        <div className="px-3 pb-2 text-[10px] text-gray-300">
+          {item.attachments!.length} 个附件
+        </div>
+      )}
     </div>
   );
 }
@@ -260,7 +241,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
   function startEdit(item: PrepItem) {
     setPendingNew(null);
     setEditingId(item.id);
-    setEditDraft({ ...item });
+    setEditDraft({ ...item, attributes: [...(item.attributes ?? [])] });
   }
 
   function saveEdit() {
@@ -296,6 +277,10 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
     onUpdate(items.filter((p) => p.id !== id));
   }
 
+  function updateItemDirect(id: string, updated: PrepItem) {
+    onUpdate(items.map((p) => (p.id === id ? updated : p)));
+  }
+
   return (
     <div className="flex flex-col gap-2.5 px-4 py-3">
       {items.length === 0 && !pendingNew && (
@@ -319,6 +304,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
             item={item}
             onEdit={() => startEdit(item)}
             onDelete={() => deleteItem(item.id)}
+            onUpdate={(updated) => updateItemDirect(item.id, updated)}
           />
         ),
       )}

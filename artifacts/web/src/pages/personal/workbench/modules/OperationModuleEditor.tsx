@@ -1,19 +1,20 @@
 /**
  * OperationModuleEditor — per-item inline editing for the 实验操作 module.
  *
- * Each step is independently in view | editing | creating mode.
- * VIEW: click step name or pencil → enters editing for that step.
- * EDIT: full card form with per-step save ✓ and cancel ✗.
- * Saves go directly to onUpdate (no module-level draft).
+ * Aligned with SystemModuleEditor:
+ *  - params: Tag[] — structured key:value parameter tags (replaces plain string)
+ *  - VIEW card: step number + name + AttributeTagRow (direct edit, no full edit needed)
+ *  - EDIT card: name, AttributeTagRow for params, notes textarea, attachments
  */
 
 import React, { useState } from "react";
 import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { OperationStep, AttachmentMeta } from "@/types/ontologyModules";
+import type { OperationStep } from "@/types/ontologyModules";
 import { ItemField } from "./shared/ItemField";
 import { AttachmentArea } from "./shared/AttachmentArea";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -24,7 +25,7 @@ function makeId(): string {
 }
 
 function makeBlankStep(order: number): OperationStep {
-  return { id: makeId(), order, name: "", attachments: [] };
+  return { id: makeId(), order, name: "", params: [], attachments: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -87,12 +88,12 @@ function OperationStepEditCard({ draft, onChange, onSave, onCancel }: EditCardPr
           />
         </ItemField>
 
-        <ItemField label="关键参数" hint="功率、温度、时长等关键量">
-          <Input
-            value={draft.params ?? ""}
-            onChange={(e) => set("params", e.target.value)}
-            placeholder="如：RF 150 W, 5 min, Ar 20 sccm"
-            className="h-8 text-sm font-mono"
+        <ItemField label="关键参数" hint="点击标签修改；回车确认">
+          <AttributeTagRow
+            tags={draft.params}
+            onChange={(tags) => set("params", tags)}
+            keyPlaceholder="参数名"
+            valuePlaceholder="量值"
           />
         </ItemField>
 
@@ -123,9 +124,10 @@ interface ViewCardProps {
   step: OperationStep;
   onEdit: () => void;
   onDelete: () => void;
+  onUpdate: (updated: OperationStep) => void;
 }
 
-function OperationStepViewCard({ step, onEdit, onDelete }: ViewCardProps) {
+function OperationStepViewCard({ step, onEdit, onDelete, onUpdate }: ViewCardProps) {
   return (
     <div className="flex gap-3 group">
       {/* Step number */}
@@ -141,7 +143,7 @@ function OperationStepViewCard({ step, onEdit, onDelete }: ViewCardProps) {
       </div>
 
       {/* Content card */}
-      <div className="flex-1 min-w-0 bg-white border border-gray-100 rounded-lg shadow-sm px-3 py-2 flex flex-col gap-1">
+      <div className="flex-1 min-w-0 bg-white border border-gray-100 rounded-lg shadow-sm px-3 py-2 flex flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">
           <button
             type="button"
@@ -161,11 +163,14 @@ function OperationStepViewCard({ step, onEdit, onDelete }: ViewCardProps) {
           </div>
         </div>
 
-        {step.params && (
-          <span className="text-[11px] font-mono text-gray-500 bg-gray-50 border border-gray-100 rounded px-1.5 py-0.5 w-fit">
-            {step.params}
-          </span>
-        )}
+        {/* Params — direct key:value tag edit */}
+        <AttributeTagRow
+          tags={step.params}
+          onChange={(tags) => onUpdate({ ...step, params: tags })}
+          keyPlaceholder="参数名"
+          valuePlaceholder="量值"
+        />
+
         {step.notes && (
           <p className="text-xs text-gray-400 leading-relaxed">{step.notes}</p>
         )}
@@ -194,7 +199,7 @@ export function OperationModuleEditor({ steps, onUpdate }: EditorProps) {
   function startEdit(step: OperationStep) {
     setPendingNew(null);
     setEditingId(step.id);
-    setEditDraft({ ...step });
+    setEditDraft({ ...step, params: [...(step.params ?? [])] });
   }
 
   function saveEdit() {
@@ -227,11 +232,14 @@ export function OperationModuleEditor({ steps, onUpdate }: EditorProps) {
 
   function deleteItem(id: string) {
     if (editingId === id) cancelEdit();
-    // Re-number after deletion
     const remaining = steps
       .filter((s) => s.id !== id)
       .map((s, idx) => ({ ...s, order: idx + 1 }));
     onUpdate(remaining);
+  }
+
+  function updateItemDirect(id: string, updated: OperationStep) {
+    onUpdate(steps.map((s) => (s.id === id ? updated : s)));
   }
 
   return (
@@ -257,6 +265,7 @@ export function OperationModuleEditor({ steps, onUpdate }: EditorProps) {
             step={step}
             onEdit={() => startEdit(step)}
             onDelete={() => deleteItem(step.id)}
+            onUpdate={(updated) => updateItemDirect(step.id, updated)}
           />
         ),
       )}

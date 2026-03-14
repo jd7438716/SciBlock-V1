@@ -16,13 +16,10 @@ import React, { useState } from "react";
 import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { TagBadge } from "@/components/ui/TagBadge";
-import type { Tag } from "@/types/experimentFields";
-import { makeTag } from "@/types/experimentFields";
-import type { SystemObject, AttachmentMeta } from "@/types/ontologyModules";
-import { ItemCard } from "./shared/ItemCard";
+import type { SystemObject } from "@/types/ontologyModules";
 import { ItemField } from "./shared/ItemField";
 import { AttachmentArea } from "./shared/AttachmentArea";
+import { AttributeTagRow } from "./shared/AttributeTagRow";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -46,121 +43,6 @@ function makeId(): string {
 
 function makeBlankObject(): SystemObject {
   return { id: makeId(), name: "", role: "研究基底", attributes: [], attachments: [] };
-}
-
-// ---------------------------------------------------------------------------
-// AddTagInline — key:value inline add form (matches wizard ObjectItemCard style)
-// ---------------------------------------------------------------------------
-
-interface AddTagInlineProps {
-  onAdd: (tag: Tag) => void;
-  onCancel: () => void;
-}
-
-function AddTagInline({ onAdd, onCancel }: AddTagInlineProps) {
-  const [key, setKey] = useState("");
-  const [value, setValue] = useState("");
-
-  function confirm() {
-    const trimmedKey = key.trim();
-    if (!trimmedKey) { onCancel(); return; }
-    onAdd(makeTag(trimmedKey, value.trim()));
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter") { e.preventDefault(); confirm(); }
-    if (e.key === "Escape") onCancel();
-  }
-
-  return (
-    <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
-      <input
-        autoFocus
-        value={key}
-        onChange={(e) => setKey(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="标签类型"
-        className="w-14 text-xs bg-transparent outline-none text-blue-700 placeholder:text-blue-300"
-      />
-      <span className="text-blue-300 text-xs">:</span>
-      <input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="值"
-        className="w-14 text-xs bg-transparent outline-none text-blue-700 placeholder:text-blue-300"
-      />
-      <button
-        type="button"
-        onClick={confirm}
-        className="text-green-600 hover:text-green-700 flex-shrink-0"
-        title="确认"
-      >
-        <Check size={10} />
-      </button>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-        title="取消"
-      >
-        <X size={10} />
-      </button>
-    </span>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AttributeTagRow — shared tag row (TagBadge + add button)
-//   Used both in view cards and edit cards so the experience is identical.
-// ---------------------------------------------------------------------------
-
-interface AttributeTagRowProps {
-  tags: Tag[];
-  onChange: (tags: Tag[]) => void;
-}
-
-function AttributeTagRow({ tags, onChange }: AttributeTagRowProps) {
-  const [showAdd, setShowAdd] = useState(false);
-
-  function updateTag(id: string, updated: Tag) {
-    onChange(tags.map((t) => (t.id === id ? updated : t)));
-  }
-
-  function deleteTag(id: string) {
-    onChange(tags.filter((t) => t.id !== id));
-  }
-
-  function addTag(tag: Tag) {
-    onChange([...tags, tag]);
-    setShowAdd(false);
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1.5 items-center">
-      {tags.map((tag) => (
-        <TagBadge
-          key={tag.id}
-          tag={tag}
-          onUpdate={(updated) => updateTag(tag.id, updated)}
-          onDelete={() => deleteTag(tag.id)}
-        />
-      ))}
-
-      {showAdd ? (
-        <AddTagInline onAdd={addTag} onCancel={() => setShowAdd(false)} />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowAdd(true)}
-          className="inline-flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-150 rounded-full px-2 py-0.5 transition-colors"
-        >
-          <Plus size={10} />
-          标签
-        </button>
-      )}
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
