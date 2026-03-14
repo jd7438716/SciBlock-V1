@@ -28,6 +28,7 @@ export function ExperimentHeader() {
   } = useWorkbench();
 
   const [tagInput, setTagInput] = useState("");
+  const [isAddingTag, setIsAddingTag] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
   function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -39,6 +40,22 @@ export function ExperimentHeader() {
     if (e.key === "Backspace" && tagInput === "" && currentRecord.tags.length > 0) {
       removeTag(currentRecord.tags[currentRecord.tags.length - 1]);
     }
+    if (e.key === "Escape") {
+      setTagInput("");
+      setIsAddingTag(false);
+      tagInputRef.current?.blur();
+    }
+  }
+
+  function openTagInput() {
+    setIsAddingTag(true);
+    // Defer focus so the input is rendered before we try to focus it
+    setTimeout(() => tagInputRef.current?.focus(), 0);
+  }
+
+  function handleTagInputBlur() {
+    // Collapse the input back to the ghost chip when the user leaves without typing
+    if (tagInput === "") setIsAddingTag(false);
   }
 
   return (
@@ -99,10 +116,8 @@ export function ExperimentHeader() {
       </div>
 
       {/* Row 3: Tags */}
-      <div
-        className="flex flex-wrap items-center gap-1.5 min-h-[24px] cursor-text"
-        onClick={() => tagInputRef.current?.focus()}
-      >
+      <div className="flex flex-wrap items-center gap-1.5 min-h-[24px]">
+        {/* Existing tag chips */}
         {currentRecord.tags.map((tag) => (
           <span
             key={tag}
@@ -121,15 +136,31 @@ export function ExperimentHeader() {
           </span>
         ))}
 
-        <input
-          ref={tagInputRef}
-          type="text"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={handleTagKeyDown}
-          placeholder={currentRecord.tags.length === 0 ? "添加标签（Enter 确认）" : ""}
-          className="flex-1 min-w-[80px] text-xs outline-none bg-transparent text-gray-600 placeholder-gray-300"
-        />
+        {/* Inline tag input — visible only while actively adding */}
+        {isAddingTag && (
+          <input
+            ref={tagInputRef}
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={handleTagKeyDown}
+            onBlur={handleTagInputBlur}
+            placeholder="输入标签，Enter 确认"
+            className="text-xs outline-none bg-transparent text-gray-600 placeholder-gray-300 min-w-[110px]"
+          />
+        )}
+
+        {/* Ghost chip — the explicit "add tag" affordance.
+            Always visible when not in input mode so users can discover it. */}
+        {!isAddingTag && (
+          <button
+            onClick={openTagInput}
+            className="inline-flex items-center gap-0.5 text-xs text-gray-400 border border-dashed border-gray-300 rounded-full px-2 py-0.5 hover:border-gray-400 hover:text-gray-500 transition-colors"
+          >
+            <span className="text-[11px] leading-none">＋</span>
+            添加标签
+          </button>
+        )}
       </div>
     </div>
   );
