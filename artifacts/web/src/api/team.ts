@@ -44,6 +44,16 @@ export function updateStudent(
   });
 }
 
+export function updateStudentStatus(
+  id: string,
+  status: import("../types/team").StudentStatus,
+): Promise<{ student: Student }> {
+  return apiFetch<{ student: Student }>(`/team/members/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Papers
 // ---------------------------------------------------------------------------

@@ -31,10 +31,10 @@ export const STATUS_LABELS: Record<StudentStatus, string> = {
   graduated: "已毕业",
 };
 
-export const STATUS_COLORS: Record<StudentStatus, { bg: string; text: string }> = {
-  active:    { bg: "bg-green-100",  text: "text-green-700"  },
-  pending:   { bg: "bg-yellow-100", text: "text-yellow-700" },
-  graduated: { bg: "bg-gray-100",   text: "text-gray-600"   },
+export const STATUS_COLORS: Record<StudentStatus, { bg: string; text: string; ring: string }> = {
+  active:    { bg: "bg-green-100",  text: "text-green-800",  ring: "ring-green-200"  },
+  pending:   { bg: "bg-yellow-100", text: "text-yellow-700", ring: "ring-yellow-200" },
+  graduated: { bg: "bg-blue-100",   text: "text-blue-800",   ring: "ring-blue-200"   },
 };
 
 // ---------------------------------------------------------------------------
@@ -104,6 +104,7 @@ export interface UpdateStudentRequest {
   enrollmentYear?: number;
   degree?: StudentDegree;
   researchTopic?: string;
+  status?: StudentStatus;
 }
 
 export interface AddPaperRequest {

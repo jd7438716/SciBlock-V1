@@ -3,15 +3,17 @@
  *
  * 结构：
  *   彩色渐变顶条
- *   主体区：头像 | 姓名 / 学位 / 年级 / 研究课题 / 联系方式
+ *   主体区：头像 | 姓名 / 学位 / 年级 / 状态标签（可交互）/ 研究课题 / 联系方式
  *   统计栏：论文数 · 周报数 · 记录数
  *
  * Layer: detail sub-component
  */
 
 import { Mail, Phone } from "lucide-react";
-import type { Student } from "../../../types/team";
+import type { Student, StudentStatus } from "../../../types/team";
 import { DEGREE_LABELS } from "../../../types/team";
+import { updateStudentStatus }  from "../../../api/team";
+import { StudentStatusTag } from "../../../components/team/StudentStatusTag";
 
 // ---------------------------------------------------------------------------
 // Palette helper
@@ -50,10 +52,11 @@ function StatBadge({ value, label }: { value: number; label: string }) {
 // ---------------------------------------------------------------------------
 
 export interface ProfileCardProps {
-  student:     Student;
-  paperCount:  number;
-  reportCount: number;
-  noteCount:   number;
+  student:        Student;
+  paperCount:     number;
+  reportCount:    number;
+  noteCount:      number;
+  onStudentChange: (updated: Student) => void;
 }
 
 export function ProfileCard({
@@ -61,8 +64,14 @@ export function ProfileCard({
   paperCount,
   reportCount,
   noteCount,
+  onStudentChange,
 }: ProfileCardProps) {
   const pal = palette(student.name);
+
+  async function handleStatusSave(next: StudentStatus) {
+    const { student: updated } = await updateStudentStatus(student.id, next);
+    onStudentChange(updated);
+  }
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
@@ -89,6 +98,7 @@ export function ProfileCard({
 
           {/* Name / meta */}
           <div className="flex-1 min-w-0 pt-0.5">
+            {/* Name row */}
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base font-bold text-gray-900 leading-none">
                 {student.name}
@@ -99,6 +109,13 @@ export function ProfileCard({
               <span className="text-[10px] text-gray-400 font-medium">
                 {student.enrollmentYear} 级
               </span>
+              {/* Interactive status tag */}
+              <StudentStatusTag
+                status={student.status}
+                onSave={handleStatusSave}
+                stopPropagation={false}
+                compact
+              />
             </div>
 
             <p className="text-xs text-gray-500 mt-1.5 leading-relaxed line-clamp-2">

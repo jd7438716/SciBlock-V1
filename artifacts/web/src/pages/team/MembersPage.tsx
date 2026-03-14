@@ -9,7 +9,7 @@ import { useLocation } from "wouter";
 import type { Student, StudentStatus } from "../../types/team";
 import { STATUS_LABELS } from "../../types/team";
 import { fetchMembers } from "../../api/team";
-import MemberCard from "./MemberCard";
+import MemberCard  from "./MemberCard";
 import InviteModal from "./InviteModal";
 
 const STATUS_FILTERS: { value: StudentStatus | "all"; label: string }[] = [
@@ -20,10 +20,10 @@ const STATUS_FILTERS: { value: StudentStatus | "all"; label: string }[] = [
 ];
 
 export default function MembersPage() {
-  const [, navigate] = useLocation();
+  const [, navigate]    = useLocation();
   const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [filter, setFilter] = useState<StudentStatus | "all">("all");
 
@@ -45,6 +45,13 @@ export default function MembersPage() {
   function handleInvited() {
     setShowInvite(false);
     void load();
+  }
+
+  /**
+   * 状态更新回调：直接替换本地列表中对应学生，不重新加载全列表
+   */
+  function handleStatusChange(updated: Student) {
+    setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
   }
 
   const filtered = filter === "all" ? students : students.filter(s => s.status === filter);
@@ -114,7 +121,7 @@ export default function MembersPage() {
           <div className="text-center py-16 text-gray-400">
             <p className="text-4xl mb-3">👥</p>
             <p className="text-sm font-medium text-gray-500">
-              {filter === "all" ? "暂无团队成员" : `暂无${STATUS_LABELS[filter]}成员`}
+              {filter === "all" ? "暂无团队成员" : `暂无${STATUS_LABELS[filter as StudentStatus]}成员`}
             </p>
             {filter === "all" && (
               <button
@@ -132,6 +139,7 @@ export default function MembersPage() {
                 key={s.id}
                 student={s}
                 onClick={() => navigate(`/home/members/${s.id}`)}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </div>

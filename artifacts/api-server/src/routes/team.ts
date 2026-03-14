@@ -193,9 +193,10 @@ router.get("/members/:id", async (req, res) => {
 });
 
 router.patch("/members/:id", async (req, res) => {
-  const { name, phone, email, enrollmentYear, degree, researchTopic } = req.body as {
+  const { name, phone, email, enrollmentYear, degree, researchTopic, status } = req.body as {
     name?: string; phone?: string; email?: string;
     enrollmentYear?: number; degree?: string; researchTopic?: string;
+    status?: string;
   };
 
   const patch: Record<string, unknown> = {};
@@ -205,6 +206,7 @@ router.patch("/members/:id", async (req, res) => {
   if (enrollmentYear !== undefined) patch.enrollmentYear = enrollmentYear;
   if (degree !== undefined) patch.degree = degree;
   if (researchTopic !== undefined) patch.researchTopic = researchTopic;
+  if (status !== undefined) patch.status = status;
 
   try {
     const [updated] = await db

@@ -85,6 +85,7 @@ export default function MemberDetailPage() {
           paperCount={paperCount}
           reportCount={reportCount}
           noteCount={notes.length}
+          onStudentChange={setStudent}
         />
 
         <section>
