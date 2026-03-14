@@ -34,11 +34,17 @@ interface TrashContextValue {
   permanentlyDelete: (recordId: string) => void;
 
   /**
-   * Returns records that have been restored for a given SciNote.
-   * WorkbenchProvider passes these as extraRecords on mount so restored
-   * records reappear in the workbench without additional round-trips.
+   * Read (but do NOT clear) records in the restored pool for a SciNote.
+   * ExperimentWorkbenchPage calls this once via useRef on mount.
    */
   getRestoredForSciNote: (sciNoteId: string) => ExperimentRecord[];
+
+  /**
+   * Clear the restored pool for a SciNote after its records have been
+   * consumed by WorkbenchProvider. Must be called from a useEffect so that
+   * setState is not triggered during render.
+   */
+  clearRestoredForSciNote: (sciNoteId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,6 +116,19 @@ export function TrashProvider({ children }: { children: React.ReactNode }) {
     return restoredPool[sciNoteId] ?? [];
   }
 
+  /**
+   * Remove the restored-record pool for a SciNote.
+   * Call from a useEffect (not during render) so setState is safe.
+   */
+  function clearRestoredForSciNote(sciNoteId: string) {
+    setRestoredPool((prev) => {
+      if (!prev[sciNoteId]) return prev; // nothing to clear
+      const next = { ...prev };
+      delete next[sciNoteId];
+      return next;
+    });
+  }
+
   // ---------------------------------------------------------------------------
   // Value
   // ---------------------------------------------------------------------------
@@ -122,6 +141,7 @@ export function TrashProvider({ children }: { children: React.ReactNode }) {
         restoreRecord,
         permanentlyDelete,
         getRestoredForSciNote,
+        clearRestoredForSciNote,
       }}
     >
       {children}

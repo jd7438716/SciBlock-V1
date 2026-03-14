@@ -116,10 +116,17 @@ export function WorkbenchProvider({
   // Seed one initial record + any restored records for this sciNote.
   const [ontologyVersions] = useState<OntologyVersion[]>(SEED_ONTOLOGY_VERSIONS);
 
-  const [records, setRecords] = useState<ExperimentRecord[]>(() => [
-    createExperimentRecord(sciNoteId, DEFAULT_ONTOLOGY_VERSION, 1),
-    ...extraRecords,
-  ]);
+  const [records, setRecords] = useState<ExperimentRecord[]>(() => {
+    const seed = createExperimentRecord(sciNoteId, DEFAULT_ONTOLOGY_VERSION, 1);
+    // Deduplicate by record id — defense-in-depth against pool not being cleared
+    const seen = new Set<string>([seed.id]);
+    const deduped = extraRecords.filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    return [seed, ...deduped];
+  });
   const [currentRecordId, setCurrentRecordId] = useState<string>(
     () => records[0].id,
   );
