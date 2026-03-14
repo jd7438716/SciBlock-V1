@@ -110,7 +110,33 @@ Field categories `实验设备`, `实验材料`, `研究对象` default to `"obj
 - `/signup` — access by invitation (no public registration)
 - `/personal/new-experiment` — experiment initialization wizard (6 steps)
 - `/personal/experiment/:id` — detail page for wizard-created SciNotes
+- `/personal/experiment/:id/workbench` — 3-panel experiment workbench
 - `/personal/note/:id` — legacy stub for placeholder SciNotes
+
+**Workbench Architecture (`pages/personal/workbench/`):**
+
+3-panel layout: OntologyPanel (left) | EditorPanel (middle) | UtilityRail (right)
+
+EditorPanel sub-components:
+- `editor/ExperimentDocHeader.tsx` — read-only metadata (title, type, status, tags)
+- `editor/ModuleSectionCard.tsx` — collapsible card per module; click ↔ left nav sync; confirm/reopen
+- `editor/NotesSection.tsx` — TipTap rich-text notes; AI flow-draft insert bridge
+- `editor/ReportSection.tsx` — AI report UI (progress → generating → ready/edit)
+- `editor/ReportProgress.tsx` — module confirmation checklist + CTA button
+- `modules/shared/ModuleBodyRenderer.tsx` — dispatcher to per-module read/edit renderers
+
+Report generation flow:
+1. When ALL 5 modules (system/preparation/operation/measurement/data) are confirmed, `WorkbenchContext.setModuleStatus` auto-triggers `generateExperimentReport()` from `api/report.ts`
+2. Report HTML is persisted to `ExperimentRecord.reportHtml` (sessionStorage via workbenchStorage)
+3. `ReportSection` shows progress → spinner → TipTap read-only view → edit mode on demand
+4. Edit mode: TipTap becomes editable; "保存修改" calls `updateReport(html)`; "取消" restores
+
+New type files:
+- `types/report.ts` — `ReportStatus`, `ExperimentReport`, `ReportGeneratorInput`
+- `types/workbench.ts` — `ExperimentRecord.reportHtml?`, `ALL_MODULE_KEYS` constant added
+
+New API file:
+- `api/report.ts` — `generateExperimentReport(input)` — stub with 1.6s delay; replace body with real `fetch()` for production
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 

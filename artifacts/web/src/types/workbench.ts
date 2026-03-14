@@ -66,6 +66,12 @@ export interface ExperimentRecord {
   /** TipTap HTML content */
   editorContent: string;
   createdAt: string;
+  /**
+   * AI-generated experiment report HTML.
+   * Persisted to sessionStorage alongside the rest of the record.
+   * Undefined until all five modules are confirmed and the report is generated.
+   */
+  reportHtml?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,4 +96,13 @@ export const FLOW_TRIGGER_KEYS: OntologyModuleKey[] = [
   "preparation",
   "operation",
   "measurement",
+];
+
+/** All 5 modules — must all be confirmed to trigger AI report generation. */
+export const ALL_MODULE_KEYS: OntologyModuleKey[] = [
+  "system",
+  "preparation",
+  "operation",
+  "measurement",
+  "data",
 ];

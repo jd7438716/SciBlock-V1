@@ -36,6 +36,7 @@ import { useWorkbench } from "@/contexts/WorkbenchContext";
 import { ExperimentDocHeader } from "./editor/ExperimentDocHeader";
 import { ModuleSectionCard } from "./editor/ModuleSectionCard";
 import { NotesSection } from "./editor/NotesSection";
+import { ReportSection } from "./editor/ReportSection";
 import type { OntologyModuleKey } from "@/types/workbench";
 
 export function EditorPanel() {
@@ -73,8 +74,11 @@ export function EditorPanel() {
             />
           ))}
 
-          {/* Free-form notes — always at the bottom */}
+          {/* Free-form notes */}
           <NotesSection />
+
+          {/* AI Report — always visible; status-driven display */}
+          <ReportSection />
 
           {/* Bottom padding so the last card isn't flush against the edge */}
           <div className="h-8" />

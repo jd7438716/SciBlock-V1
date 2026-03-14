@@ -16,7 +16,9 @@ import type {
   WorkbenchFocusMode,
 } from "@/types/workbench";
 import type { OntologyModuleStructuredData } from "@/types/ontologyModules";
-import { FLOW_TRIGGER_KEYS } from "@/types/workbench";
+import type { ReportStatus } from "@/types/report";
+import { FLOW_TRIGGER_KEYS, ALL_MODULE_KEYS } from "@/types/workbench";
+import { generateExperimentReport } from "@/api/report";
 import {
   DEFAULT_ONTOLOGY_VERSION,
   SEED_ONTOLOGY_VERSIONS,
@@ -89,6 +91,16 @@ interface WorkbenchContextValue {
    */
   registerEditorInsert: (fn: (html: string) => void) => void;
   unregisterEditorInsert: () => void;
+
+  // AI Report
+  /** Derived from isGeneratingReport + currentRecord.reportHtml */
+  reportStatus: ReportStatus;
+  /** Manually trigger report generation (e.g. after partial confirm or retry). */
+  triggerReportGeneration: () => void;
+  /** Persist user-edited report HTML back to the record. */
+  updateReport: (html: string) => void;
+  /** Clear the generated report (reset to idle). */
+  clearReport: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +216,10 @@ export function WorkbenchProvider({
 
   // Flow draft
   const [flowDraftInserted, setFlowDraftInserted] = useState(false);
+
+  // Report generation
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState(false);
 
   // Editor insert bridge (registered by EditorPanel)
   const editorInsertRef = useRef<((html: string) => void) | null>(null);
@@ -335,25 +351,58 @@ export function WorkbenchProvider({
       ),
     );
 
-    // Check if all FLOW_TRIGGER_KEYS are now confirmed — if so, insert flow draft.
-    if (status === "confirmed" && !flowDraftInserted) {
+    if (status === "confirmed") {
       setRecords((prev) => {
         const rec = prev.find((r) => r.id === currentRecordId);
         if (!rec) return prev;
         const updatedModules = rec.currentModules.map((m) =>
           m.key === key ? { ...m, status: "confirmed" as OntologyModuleStatus } : m,
         );
-        const allConfirmed = FLOW_TRIGGER_KEYS.every(
+
+        // 1. Flow-draft: trigger when the 4 flow keys are all confirmed
+        if (!flowDraftInserted) {
+          const flowAllConfirmed = FLOW_TRIGGER_KEYS.every(
+            (k) => updatedModules.find((m) => m.key === k)?.status === "confirmed",
+          );
+          if (flowAllConfirmed) {
+            const triggerModules = updatedModules.filter((m) =>
+              FLOW_TRIGGER_KEYS.includes(m.key),
+            );
+            const html = generateFlowDraft(triggerModules);
+            editorInsertRef.current?.(html);
+            setFlowDraftInserted(true);
+          }
+        }
+
+        // 2. Report: auto-trigger when ALL 5 modules are confirmed AND no
+        //    report exists yet for this record (avoid re-generating on re-confirm).
+        const reportAllConfirmed = ALL_MODULE_KEYS.every(
           (k) => updatedModules.find((m) => m.key === k)?.status === "confirmed",
         );
-        if (allConfirmed) {
-          const triggerModules = updatedModules.filter((m) =>
-            FLOW_TRIGGER_KEYS.includes(m.key),
-          );
-          const html = generateFlowDraft(triggerModules);
-          editorInsertRef.current?.(html);
-          setFlowDraftInserted(true);
+        if (reportAllConfirmed && !rec.reportHtml && !isGeneratingReport) {
+          // Trigger with updated modules (not the stale closure value)
+          setIsGeneratingReport(true);
+          setReportError(false);
+          generateExperimentReport({
+            title: rec.title,
+            experimentType,
+            objective,
+            modules: updatedModules,
+          })
+            .then((html) => {
+              setRecords((prev2) =>
+                prev2.map((r) =>
+                  r.id === currentRecordId ? { ...r, reportHtml: html } : r,
+                ),
+              );
+              setIsGeneratingReport(false);
+            })
+            .catch(() => {
+              setIsGeneratingReport(false);
+              setReportError(true);
+            });
         }
+
         return prev.map((r) =>
           r.id === currentRecordId ? { ...r, currentModules: updatedModules } : r,
         );
@@ -371,6 +420,63 @@ export function WorkbenchProvider({
     patchCurrentModules((modules) =>
       modules.map((m) => ({ ...m, isHighlighted: false })),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Report actions
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Compute reportStatus from transient flags + persisted record.
+   * Kept as a plain function (not useMemo) so the value is always fresh
+   * when consumed by the context value object below.
+   */
+  function computeReportStatus(
+    rec: ExperimentRecord,
+    generating: boolean,
+    errored: boolean,
+  ): ReportStatus {
+    if (generating)    return "generating";
+    if (errored)       return "error";
+    if (rec.reportHtml) return "ready";
+    return "idle";
+  }
+
+  function triggerReportGeneration() {
+    if (isGeneratingReport) return;
+    setIsGeneratingReport(true);
+    setReportError(false);
+
+    // Capture the modules at trigger time — async callback must not
+    // close over stale state, so we read from the functional updater.
+    const rec = records.find((r) => r.id === currentRecordId) ?? records[0];
+    generateExperimentReport({
+      title: rec.title,
+      experimentType,
+      objective,
+      modules: rec.currentModules,
+    })
+      .then((html) => {
+        setRecords((prev) =>
+          prev.map((r) =>
+            r.id === currentRecordId ? { ...r, reportHtml: html } : r,
+          ),
+        );
+        setIsGeneratingReport(false);
+      })
+      .catch(() => {
+        setIsGeneratingReport(false);
+        setReportError(true);
+      });
+  }
+
+  function updateReport(html: string) {
+    patchCurrentRecord({ reportHtml: html });
+  }
+
+  function clearReport() {
+    patchCurrentRecord({ reportHtml: undefined });
+    setReportError(false);
   }
 
   // ---------------------------------------------------------------------------
@@ -433,6 +539,10 @@ export function WorkbenchProvider({
     flowDraftInserted,
     registerEditorInsert,
     unregisterEditorInsert,
+    reportStatus: computeReportStatus(currentRecord, isGeneratingReport, reportError),
+    triggerReportGeneration,
+    updateReport,
+    clearReport,
   };
 
   return (
