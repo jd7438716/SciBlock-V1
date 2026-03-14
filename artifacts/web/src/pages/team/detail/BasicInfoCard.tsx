@@ -1,329 +1,424 @@
 /**
- * BasicInfoCard — 基本信息卡片（内联逐字段点击编辑）
+ * BasicInfoCard — 学生基本信息（PrepItemViewCard 风格）
+ *
+ * 视图模式：分类标签(学位) | 姓名(粗体) | 状态标签 | 悬停✏️
+ *           属性pill: 入学年份 / 电话 / 邮箱 / 研究课题
+ * 编辑模式：展开为 PrepItemEditCard 风格表单
  *
  * Layer: component
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Check, X, Pencil } from "lucide-react";
 import type { Student, StudentDegree } from "../../../types/team";
-import { DEGREE_LABELS, DEGREE_OPTIONS } from "../../../types/team";
+import { DEGREE_LABELS, DEGREE_OPTIONS, STATUS_LABELS, STATUS_COLORS } from "../../../types/team";
 import { updateStudent } from "../../../api/team";
 
 // ---------------------------------------------------------------------------
-// Types
+// FieldPill — single "key: value" pill with inline edit
 // ---------------------------------------------------------------------------
 
-type FieldKey = "name" | "degree" | "enrollmentYear" | "phone" | "email" | "researchTopic";
+interface FieldPillProps {
+  label: string;
+  value: string;
+  inputWidth?: string;
+  multiline?: boolean;
+  onSave: (v: string) => Promise<void>;
+}
+
+function FieldPill({ label, value, inputWidth = "w-28", multiline = false, onSave }: FieldPillProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function start() { setDraft(value); setEditing(true); }
+
+  async function confirm() {
+    setSaving(true);
+    try { await onSave(draft.trim()); setEditing(false); }
+    finally { setSaving(false); }
+  }
+
+  function cancel() { setEditing(false); setDraft(value); }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void confirm(); }
+    if (e.key === "Escape") cancel();
+  }
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-start gap-1 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1">
+        <span className="text-xs text-blue-400 flex-shrink-0 mt-0.5">{label}:</span>
+        {multiline ? (
+          <textarea
+            ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={2}
+            className="text-xs bg-transparent outline-none text-blue-700 resize-none w-48"
+          />
+        ) : (
+          <input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={`${inputWidth} text-xs bg-transparent outline-none text-blue-700`}
+          />
+        )}
+        <button
+          onClick={() => void confirm()}
+          disabled={saving}
+          className="text-green-600 hover:text-green-700 flex-shrink-0 mt-0.5"
+        >
+          <Check size={10} />
+        </button>
+        <button onClick={cancel} className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5">
+          <X size={10} />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      onClick={start}
+      className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 rounded-full px-2.5 py-0.5 group/pill cursor-pointer transition-colors"
+    >
+      <span className="text-xs text-slate-600">
+        {label}: {value || <span className="text-slate-300 italic">未填写</span>}
+      </span>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DegreePicker — 内联学位选择器
+// ---------------------------------------------------------------------------
+
+interface DegreePickerProps {
+  value: StudentDegree;
+  onSave: (v: StudentDegree) => Promise<void>;
+  onCancel: () => void;
+}
+
+function DegreePicker({ value, onSave, onCancel }: DegreePickerProps) {
+  const [draft, setDraft] = useState<StudentDegree>(value);
+  const [saving, setSaving] = useState(false);
+
+  async function confirm() {
+    setSaving(true);
+    try { await onSave(draft); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <span className="inline-flex flex-col gap-1.5 bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5">
+      <span className="text-[10px] text-blue-400">选择学位</span>
+      <div className="flex gap-1 flex-wrap">
+        {DEGREE_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => setDraft(opt.value)}
+            className={`text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none transition-colors ${
+              draft === opt.value
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-1">
+        <button onClick={() => void confirm()} disabled={saving} className="text-[10px] text-green-700 font-medium hover:underline">
+          确认
+        </button>
+        <span className="text-gray-300 text-[10px]">·</span>
+        <button onClick={onCancel} className="text-[10px] text-gray-400 hover:underline">取消</button>
+      </div>
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edit form (PrepItemEditCard style)
+// ---------------------------------------------------------------------------
+
+interface EditFormProps {
+  student: Student;
+  onSave: (s: Student) => void;
+  onCancel: () => void;
+}
+
+function EditForm({ student, onSave, onCancel }: EditFormProps) {
+  const [form, setForm] = useState({ ...student });
+  const [saving, setSaving] = useState(false);
+
+  function set(k: keyof Student, v: unknown) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function save() {
+    setSaving(true);
+    try {
+      const { student: updated } = await updateStudent(student.id, {
+        name: form.name,
+        degree: form.degree,
+        enrollmentYear: form.enrollmentYear,
+        phone: form.phone ?? undefined,
+        email: form.email ?? undefined,
+        researchTopic: form.researchTopic,
+      });
+      onSave(updated);
+    } finally { setSaving(false); }
+  }
+
+  const currentYear = new Date().getFullYear();
+  const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - i);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+      {/* Edit header */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+        <span className="text-sm font-medium text-gray-700 truncate">
+          {form.name.trim() || "学生信息"}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-700 px-1.5 py-1 rounded transition-colors"
+          >
+            <X size={12} /> 取消
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={saving || !form.name.trim()}
+            className="flex items-center gap-0.5 text-xs bg-gray-900 text-white px-2.5 py-1 rounded hover:bg-gray-700 disabled:opacity-40 transition-colors font-medium"
+          >
+            <Check size={12} /> 保存
+          </button>
+        </div>
+      </div>
+
+      {/* Fields */}
+      <div className="px-3 py-3 flex flex-col gap-3">
+        {/* Name */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-gray-500">姓名 *</span>
+          <input
+            autoFocus
+            value={form.name}
+            onChange={e => set("name", e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && form.name.trim()) void save(); }}
+            className="h-8 text-sm border border-gray-200 rounded-lg px-2.5 focus:outline-none focus:ring-2 focus:ring-black/10"
+          />
+        </div>
+
+        {/* Degree */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-gray-500">当前学位</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {DEGREE_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => set("degree", opt.value)}
+                className={`text-xs font-medium border rounded-full px-3 py-1 leading-none transition-colors ${
+                  form.degree === opt.value
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Enrollment year */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-gray-500">入学年份</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {YEARS.map(y => (
+              <button
+                key={y}
+                type="button"
+                onClick={() => set("enrollmentYear", y)}
+                className={`text-xs border rounded-full px-2.5 py-1 leading-none transition-colors ${
+                  form.enrollmentYear === y
+                    ? "bg-gray-900 text-white border-gray-900"
+                    : "bg-white text-gray-500 border-gray-300 hover:border-gray-500"
+                }`}
+              >
+                {y}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Phone */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-gray-500">联系电话</span>
+          <input
+            value={form.phone ?? ""}
+            onChange={e => set("phone", e.target.value || null)}
+            placeholder="13800000000"
+            className="h-8 text-sm border border-gray-200 rounded-lg px-2.5 focus:outline-none focus:ring-2 focus:ring-black/10"
+          />
+        </div>
+
+        {/* Email */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-gray-500">邮箱</span>
+          <input
+            type="email"
+            value={form.email ?? ""}
+            onChange={e => set("email", e.target.value || null)}
+            placeholder="student@university.edu"
+            className="h-8 text-sm border border-gray-200 rounded-lg px-2.5 focus:outline-none focus:ring-2 focus:ring-black/10"
+          />
+        </div>
+
+        {/* Research topic */}
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-gray-500">研究课题</span>
+          <textarea
+            value={form.researchTopic}
+            onChange={e => set("researchTopic", e.target.value)}
+            rows={2}
+            className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-black/10 resize-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
 
 interface Props {
   student: Student;
   onUpdated: (s: Student) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Card shell
-// ---------------------------------------------------------------------------
-
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100">
-        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-      </div>
-      <div className="px-6 py-2">{children}</div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Pencil icon
-// ---------------------------------------------------------------------------
-
-function PencilIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M11.013 2.513a1.75 1.75 0 0 1 2.475 2.474L6.226 12.25l-3.183.708.708-3.183 7.262-7.262z" />
-    </svg>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// EditableRow — single field row with read / edit states
-// ---------------------------------------------------------------------------
-
-interface EditableRowProps {
-  label: string;
-  displayValue: string;
-  editing: boolean;
-  onStartEdit: () => void;
-  onSave: (raw: string) => void;
-  onCancel: () => void;
-  renderEditor: (save: () => void, cancel: () => void) => React.ReactNode;
-  saving?: boolean;
-}
-
-function EditableRow({
-  label, displayValue, editing,
-  onStartEdit, onSave, onCancel,
-  renderEditor, saving,
-}: EditableRowProps) {
-  void onSave; // used by renderEditor via closures
-  return (
-    <div className="py-3.5 border-b border-gray-100 last:border-0">
-      {!editing ? (
-        /* Read mode */
-        <div
-          className="flex items-center gap-2 group cursor-pointer"
-          onClick={onStartEdit}
-        >
-          <span className="w-24 text-sm text-gray-400 flex-shrink-0 select-none">{label}</span>
-          <span className="flex-1 text-sm text-gray-900 min-h-[1.25rem]">
-            {displayValue || <span className="text-gray-300 italic">—</span>}
-          </span>
-          <span className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity flex-shrink-0">
-            <PencilIcon />
-          </span>
-        </div>
-      ) : (
-        /* Edit mode */
-        <div>
-          <span className="block text-xs text-gray-400 mb-1.5 select-none">{label}</span>
-          {renderEditor(
-            () => { /* save handled inline in each editor */ },
-            onCancel,
-          )}
-          {saving && (
-            <p className="text-xs text-gray-400 mt-1">保存中…</p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export default function BasicInfoCard({ student, onUpdated }: Props) {
-  const [editing, setEditing] = useState<FieldKey | null>(null);
-  const [draft, setDraft] = useState<string>("");
-  const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
+  const [editingFull, setEditingFull] = useState(false);
+  const [editingDegree, setEditingDegree] = useState(false);
 
-  // Focus input when entering edit mode
-  useEffect(() => {
-    if (editing) {
-      setTimeout(() => {
-        (inputRef.current as HTMLElement | null)?.focus();
-      }, 50);
-    }
-  }, [editing]);
+  const sc = STATUS_COLORS[student.status] ?? STATUS_COLORS.active;
 
-  function startEdit(field: FieldKey) {
-    const current = fieldCurrentValue(field);
-    setDraft(current);
-    setEditing(field);
+  async function saveField(patch: Partial<Student>) {
+    const req: import("../../../types/team").UpdateStudentRequest = {
+      name:           patch.name,
+      degree:         patch.degree,
+      enrollmentYear: patch.enrollmentYear,
+      phone:          patch.phone ?? undefined,
+      email:          patch.email ?? undefined,
+      researchTopic:  patch.researchTopic,
+    };
+    const { student: updated } = await updateStudent(student.id, req);
+    onUpdated(updated);
   }
 
-  function fieldCurrentValue(field: FieldKey): string {
-    switch (field) {
-      case "name":           return student.name;
-      case "degree":         return student.degree;
-      case "enrollmentYear": return String(student.enrollmentYear);
-      case "phone":          return student.phone ?? "";
-      case "email":          return student.email ?? "";
-      case "researchTopic":  return student.researchTopic;
-    }
-  }
-
-  const save = useCallback(async () => {
-    if (!editing) return;
-    setSaving(true);
-    try {
-      const patch: Record<string, unknown> = {};
-      switch (editing) {
-        case "name":           patch.name = draft.trim(); break;
-        case "degree":         patch.degree = draft; break;
-        case "enrollmentYear": patch.enrollmentYear = parseInt(draft) || student.enrollmentYear; break;
-        case "phone":          patch.phone = draft.trim() || null; break;
-        case "email":          patch.email = draft.trim() || null; break;
-        case "researchTopic":  patch.researchTopic = draft.trim(); break;
-      }
-      const { student: updated } = await updateStudent(student.id, patch);
-      onUpdated(updated);
-      setEditing(null);
-    } catch {
-      // silently ignore — keep editing open
-    } finally {
-      setSaving(false);
-    }
-  }, [editing, draft, student, onUpdated]);
-
-  function cancel() { setEditing(null); }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void save(); }
-    if (e.key === "Escape") cancel();
-  }
-
-  // Current year for validation
-  const currentYear = new Date().getFullYear();
-  const YEARS = Array.from({ length: 10 }, (_, i) => currentYear - i);
-
-  // ---------------------------------------------------------------------------
-  // Shared save/cancel button row
-  // ---------------------------------------------------------------------------
-
-  function ActionRow() {
+  if (editingFull) {
     return (
-      <div className="flex gap-2 mt-2">
-        <button
-          onClick={() => void save()}
-          disabled={saving}
-          className="px-3 py-1 rounded-lg bg-gray-900 text-white text-xs font-medium hover:bg-black disabled:opacity-50 transition-colors"
-        >
-          保存
-        </button>
-        <button
-          onClick={cancel}
-          className="px-3 py-1 rounded-lg border border-gray-300 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          取消
-        </button>
-      </div>
+      <EditForm
+        student={student}
+        onSave={s => { onUpdated(s); setEditingFull(false); }}
+        onCancel={() => setEditingFull(false)}
+      />
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Field display values
-  // ---------------------------------------------------------------------------
-
-  const displayValues: Record<FieldKey, string> = {
-    name:           student.name,
-    degree:         DEGREE_LABELS[student.degree] ?? student.degree,
-    enrollmentYear: `${student.enrollmentYear} 年`,
-    phone:          student.phone ?? "",
-    email:          student.email ?? "",
-    researchTopic:  student.researchTopic,
-  };
-
-  // ---------------------------------------------------------------------------
-  // Field editors
-  // ---------------------------------------------------------------------------
-
-  function textEditor(field: FieldKey, placeholder = "", type: "text" | "email" | "tel" = "text") {
-    return (_save: () => void, _cancel: () => void) => (
-      <>
-        <input
-          ref={inputRef as React.RefObject<HTMLInputElement>}
-          type={type}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-black/20"
-        />
-        <ActionRow />
-      </>
-    );
-  }
-
-  function degreeEditor() {
-    return (_save: () => void, _cancel: () => void) => (
-      <>
-        <div className="flex gap-2 flex-wrap">
-          {DEGREE_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setDraft(opt.value)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                draft === opt.value
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <ActionRow />
-      </>
-    );
-  }
-
-  function yearEditor() {
-    return (_save: () => void, _cancel: () => void) => (
-      <>
-        <div className="flex gap-2 flex-wrap">
-          {YEARS.map(y => (
-            <button
-              key={y}
-              onClick={() => setDraft(String(y))}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                draft === String(y)
-                  ? "bg-gray-900 text-white border-gray-900"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-              }`}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
-        <ActionRow />
-      </>
-    );
-  }
-
-  function topicEditor() {
-    return (_save: () => void, _cancel: () => void) => (
-      <>
-        <textarea
-          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === "Escape") cancel(); }}
-          rows={3}
-          placeholder="请输入研究课题"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black/20 resize-none"
-        />
-        <ActionRow />
-      </>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
-  const fields: Array<{
-    key: FieldKey;
-    label: string;
-    editor: (save: () => void, cancel: () => void) => React.ReactNode;
-  }> = [
-    { key: "name",           label: "姓名",     editor: textEditor("name", "请输入姓名") },
-    { key: "degree",         label: "当前学位", editor: degreeEditor() },
-    { key: "enrollmentYear", label: "入学年份", editor: yearEditor() },
-    { key: "phone",          label: "联系电话", editor: textEditor("phone", "请输入电话号码", "tel") },
-    { key: "email",          label: "邮箱",     editor: textEditor("email", "请输入邮箱地址", "email") },
-    { key: "researchTopic",  label: "研究课题", editor: topicEditor() },
-  ];
 
   return (
-    <InfoCard title="基本信息">
-      {fields.map(f => (
-        <EditableRow
-          key={f.key}
-          label={f.label}
-          displayValue={displayValues[f.key]}
-          editing={editing === f.key}
-          onStartEdit={() => startEdit(f.key)}
-          onSave={save}
-          onCancel={cancel}
-          renderEditor={f.editor}
-          saving={saving}
+    <div className="bg-white border border-gray-100 rounded-lg shadow-sm group">
+      {/* Header row */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        {/* Degree tag — click to pick inline */}
+        {editingDegree ? (
+          <DegreePicker
+            value={student.degree}
+            onSave={async (v) => { await saveField({ degree: v }); setEditingDegree(false); }}
+            onCancel={() => setEditingDegree(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setEditingDegree(true)}
+            className="flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap bg-gray-100 text-gray-500 border-gray-200 hover:opacity-70 transition-opacity"
+            title="点击修改学位"
+          >
+            {DEGREE_LABELS[student.degree] ?? student.degree}
+          </button>
+        )}
+
+        {/* Name — click to enter full edit mode */}
+        <button
+          onClick={() => setEditingFull(true)}
+          className="flex-1 text-sm font-medium text-gray-800 text-left hover:text-blue-700 transition-colors leading-snug min-w-0 truncate"
+          title="点击编辑"
+        >
+          {student.name}
+        </button>
+
+        {/* Status tag */}
+        <span
+          className={`flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap ${sc.bg} ${sc.text} border-transparent`}
+        >
+          {STATUS_LABELS[student.status]}
+        </span>
+
+        {/* Action buttons (hover) */}
+        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => setEditingFull(true)}
+            className="p-1 rounded text-gray-400 hover:text-gray-700 transition-colors"
+            title="编辑信息"
+          >
+            <Pencil size={11} />
+          </button>
+        </div>
+      </div>
+
+      {/* Attribute pills */}
+      <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+        <FieldPill
+          label="入学年份"
+          value={`${student.enrollmentYear}年`}
+          inputWidth="w-16"
+          onSave={async v => {
+            const year = parseInt(v.replace("年", "")) || student.enrollmentYear;
+            await saveField({ enrollmentYear: year });
+          }}
         />
-      ))}
-    </InfoCard>
+        <FieldPill
+          label="电话"
+          value={student.phone ?? ""}
+          inputWidth="w-28"
+          onSave={async v => saveField({ phone: v || null })}
+        />
+        <FieldPill
+          label="邮箱"
+          value={student.email ?? ""}
+          inputWidth="w-40"
+          onSave={async v => saveField({ email: v || null })}
+        />
+        <FieldPill
+          label="研究课题"
+          value={student.researchTopic}
+          inputWidth="w-56"
+          multiline
+          onSave={async v => saveField({ researchTopic: v })}
+        />
+      </div>
+    </div>
   );
 }
