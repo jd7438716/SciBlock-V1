@@ -1,5 +1,7 @@
 import type { ExperimentRecord } from "@/types/workbench";
+import type { AttachmentMeta } from "@/types/ontologyModules";
 import { makeTag } from "@/types/experimentFields";
+import { saveAttBlob, loadAttBlob } from "./attachmentStorage";
 
 // ---------------------------------------------------------------------------
 // Migration helpers
@@ -113,6 +115,77 @@ function migrateRecord(record: ExperimentRecord): ExperimentRecord {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Attachment data URL strip / restore
+// ---------------------------------------------------------------------------
+// Before saving records to sessionStorage we strip every attachment's
+// localPreviewUrl (which can be a multi-MB base64 data URL) and save it under
+// its own key via saveAttBlob().  This keeps the records JSON small so the
+// combined save never exceeds the sessionStorage quota.
+// After loading we restore localPreviewUrl from those separate keys.
+// ---------------------------------------------------------------------------
+
+function processAttList(
+  atts: AttachmentMeta[] | undefined,
+  mode: "strip" | "restore",
+): AttachmentMeta[] | undefined {
+  if (!atts?.length) return atts;
+  return atts.map((att) => {
+    if (mode === "strip") {
+      if (att.localPreviewUrl?.startsWith("data:")) {
+        saveAttBlob(att.id, att.localPreviewUrl);
+        return { ...att, localPreviewUrl: undefined };
+      }
+      return att;
+    } else {
+      if (!att.localPreviewUrl) {
+        const stored = loadAttBlob(att.id);
+        if (stored) return { ...att, localPreviewUrl: stored };
+      }
+      return att;
+    }
+  });
+}
+
+function processRecordAttachments(
+  record: ExperimentRecord,
+  mode: "strip" | "restore",
+): ExperimentRecord {
+  return {
+    ...record,
+    currentModules: record.currentModules.map((mod) => {
+      const sd = mod.structuredData;
+      if (!sd) return mod;
+      return {
+        ...mod,
+        structuredData: {
+          ...sd,
+          systemObjects: sd.systemObjects?.map((o) => ({
+            ...o,
+            attachments: processAttList(o.attachments, mode),
+          })),
+          prepItems: sd.prepItems?.map((i) => ({
+            ...i,
+            attachments: processAttList(i.attachments, mode),
+          })),
+          operationSteps: sd.operationSteps?.map((s) => ({
+            ...s,
+            attachments: processAttList(s.attachments, mode),
+          })),
+          measurementItems: sd.measurementItems?.map((m) => ({
+            ...m,
+            attachments: processAttList(m.attachments, mode),
+          })),
+          dataItems: sd.dataItems?.map((d) => ({
+            ...d,
+            attachments: processAttList(d.attachments, mode),
+          })),
+        },
+      };
+    }),
+  };
+}
+
 /**
  * Persistence layer for workbench experiment records.
  *
@@ -131,6 +204,9 @@ const workbenchKey = (sciNoteId: string): string =>
 /**
  * Load persisted records for a SciNote from sessionStorage.
  * Returns [] when nothing is stored or the stored data is corrupt.
+ *
+ * Attachment data URLs (saved separately to avoid quota issues) are restored
+ * into each attachment's localPreviewUrl field before returning.
  */
 export function loadWorkbenchRecords(sciNoteId: string): ExperimentRecord[] {
   try {
@@ -138,7 +214,9 @@ export function loadWorkbenchRecords(sciNoteId: string): ExperimentRecord[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return (parsed as ExperimentRecord[]).map(migrateRecord);
+    return (parsed as ExperimentRecord[])
+      .map(migrateRecord)
+      .map((r) => processRecordAttachments(r, "restore"));
   } catch {
     return [];
   }
@@ -147,15 +225,20 @@ export function loadWorkbenchRecords(sciNoteId: string): ExperimentRecord[] {
 /**
  * Save the current records list for a SciNote to sessionStorage.
  * Called from WorkbenchContext's useEffect on every records change.
+ *
+ * Attachment data URLs are stripped from the records before serialisation
+ * and saved under separate per-attachment sessionStorage keys so the records
+ * JSON stays small and never hits the storage quota.
  */
 export function saveWorkbenchRecords(
   sciNoteId: string,
   records: ExperimentRecord[],
 ): void {
   try {
-    sessionStorage.setItem(workbenchKey(sciNoteId), JSON.stringify(records));
+    const stripped = records.map((r) => processRecordAttachments(r, "strip"));
+    sessionStorage.setItem(workbenchKey(sciNoteId), JSON.stringify(stripped));
   } catch {
-    // sessionStorage unavailable (private mode, quota exceeded, etc.)
+    // sessionStorage unavailable (private mode, etc.)
   }
 }
 
