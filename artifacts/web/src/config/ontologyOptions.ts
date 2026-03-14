@@ -21,20 +21,21 @@ export interface OntologyOptionGroup {
 }
 
 /**
- * PrepItem.category — recommended classification labels for 实验准备 steps.
+ * PrepItem.category — generic preparation-item type labels.
  *
- * Scope: surface-science / thin-film deposition labs (initial default).
+ * Scope: domain-independent; matches the four default wizard Step 3 field groups
+ * so that wizard → workbench passthrough produces correctly colored badges.
  * Future: replace `options` with values from your experiment ontology schema.
  */
 export const PREP_CATEGORY: OntologyOptionGroup = {
-  options: ["基底清洗", "表面活化", "靶材处理", "气体配置"],
+  options: ["准备材料", "准备设备", "环境条件", "前处理事项"],
   colors: {
-    基底清洗: "bg-sky-50 text-sky-700 border-sky-200",
-    表面活化: "bg-amber-50 text-amber-700 border-amber-200",
-    靶材处理: "bg-violet-50 text-violet-700 border-violet-200",
-    气体配置: "bg-teal-50 text-teal-700 border-teal-200",
+    准备材料:  "bg-green-50 text-green-700 border-green-200",
+    准备设备:  "bg-blue-50 text-blue-700 border-blue-200",
+    环境条件:  "bg-amber-50 text-amber-700 border-amber-200",
+    前处理事项: "bg-violet-50 text-violet-700 border-violet-200",
   },
-  defaultValue: "基底清洗",
+  defaultValue: "准备材料",
 };
 
 /**

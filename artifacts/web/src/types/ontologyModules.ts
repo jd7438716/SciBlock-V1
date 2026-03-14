@@ -50,7 +50,7 @@ export interface SystemObject {
 export interface PrepItem {
   id: string;
   name: string;
-  /** Category label (e.g. "基底清洗" | "表面活化" | "靶材处理") */
+  /** Category label — generic preparation type (e.g. "准备材料" | "准备设备" | "环境条件" | "前处理事项") */
   category: string;
   /** Structured key:value attributes (e.g. [{key:"用量", value:"20 mL"}, {key:"纯度", value:"AR"}]) */
   attributes: Tag[];

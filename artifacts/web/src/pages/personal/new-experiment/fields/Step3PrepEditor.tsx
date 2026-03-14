@@ -1,8 +1,12 @@
 /**
- * PreparationModuleEditor — per-item inline editing for the 实验准备 module.
+ * Step3PrepEditor — wizard-side list editor for Step 3 (实验准备).
  *
- * Card components are shared with wizard Step3PrepEditor via:
- *   workbench/modules/shared/PrepItemCards.tsx
+ * Shares PrepItemEditCard / PrepItemViewCard with the workbench
+ * PreparationModuleEditor. Key difference: showAttachments=false
+ * (attachments are not relevant at the planning stage).
+ *
+ * Write rule: only ever writes to Step3Data.items[].
+ * Legacy Step3Data.fields is never touched here.
  */
 
 import React, { useState } from "react";
@@ -12,11 +16,7 @@ import { PREP_CATEGORY } from "@/config/ontologyOptions";
 import {
   PrepItemEditCard,
   PrepItemViewCard,
-} from "./shared/PrepItemCards";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+} from "@/pages/personal/workbench/modules/shared/PrepItemCards";
 
 function makeId(): string {
   return `prep-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -32,16 +32,12 @@ function makeBlankPrepItem(): PrepItem {
   };
 }
 
-// ---------------------------------------------------------------------------
-// PreparationModuleEditor
-// ---------------------------------------------------------------------------
-
-interface EditorProps {
+interface Props {
   items: PrepItem[];
-  onUpdate: (items: PrepItem[]) => void;
+  onChange: (items: PrepItem[]) => void;
 }
 
-export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
+export function Step3PrepEditor({ items, onChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<PrepItem | null>(null);
   const [pendingNew, setPendingNew] = useState<PrepItem | null>(null);
@@ -54,7 +50,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
 
   function saveEdit() {
     if (!editingId || !editDraft) return;
-    onUpdate(items.map((p) => (p.id === editingId ? editDraft : p)));
+    onChange(items.map((p) => (p.id === editingId ? editDraft : p)));
     setEditingId(null);
     setEditDraft(null);
   }
@@ -72,7 +68,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
 
   function saveCreate() {
     if (!pendingNew || !pendingNew.name.trim()) return;
-    onUpdate([...items, pendingNew]);
+    onChange([...items, pendingNew]);
     setPendingNew(null);
   }
 
@@ -82,17 +78,17 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
 
   function deleteItem(id: string) {
     if (editingId === id) cancelEdit();
-    onUpdate(items.filter((p) => p.id !== id));
+    onChange(items.filter((p) => p.id !== id));
   }
 
   function updateItemDirect(id: string, updated: PrepItem) {
-    onUpdate(items.map((p) => (p.id === id ? updated : p)));
+    onChange(items.map((p) => (p.id === id ? updated : p)));
   }
 
   return (
-    <div className="flex flex-col gap-2.5 px-4 py-3">
+    <div className="flex flex-col gap-2.5">
       {items.length === 0 && !pendingNew && (
-        <p className="text-xs text-gray-300 py-1 text-center">
+        <p className="text-sm text-gray-400 py-2 text-center">
           暂无准备项，点击"新增准备项"开始添加
         </p>
       )}
@@ -105,7 +101,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
             onChange={setEditDraft}
             onSave={saveEdit}
             onCancel={cancelEdit}
-            showAttachments={true}
+            showAttachments={false}
           />
         ) : (
           <PrepItemViewCard
@@ -114,7 +110,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
             onEdit={() => startEdit(item)}
             onDelete={() => deleteItem(item.id)}
             onUpdate={(updated) => updateItemDirect(item.id, updated)}
-            showAttachments={true}
+            showAttachments={false}
           />
         ),
       )}
@@ -125,7 +121,7 @@ export function PreparationModuleEditor({ items, onUpdate }: EditorProps) {
           onChange={setPendingNew}
           onSave={saveCreate}
           onCancel={cancelCreate}
-          showAttachments={true}
+          showAttachments={false}
         />
       )}
 

@@ -1,9 +1,9 @@
 import type { ExperimentField } from "./experimentFields";
-import type { MeasurementItem, DataItem, OperationStep } from "./ontologyModules";
+import type { MeasurementItem, DataItem, OperationStep, PrepItem } from "./ontologyModules";
 
 /**
- * Steps 2 and 3 share the same "configurable field groups" model (StepData).
- * Steps 4, 5, and 6 use dedicated per-item card models aligned with the workbench types.
+ * Step 2 uses the "configurable field groups" model (StepData).
+ * Steps 3, 4, 5, and 6 use dedicated per-item card models aligned with the workbench types.
  */
 
 export interface StepData {
@@ -11,7 +11,20 @@ export interface StepData {
 }
 
 export type Step2Data = StepData; // 实验系统
-export type Step3Data = StepData; // 实验准备
+
+/**
+ * Step 3 — 实验准备 uses the same per-item card model as PrepItem.
+ *
+ * Write rule: new wizard UI writes ONLY to `items`.
+ * `fields` is read-only compat for notes created before this change.
+ * No new code should ever write to `fields`.
+ */
+export interface Step3Data {
+  /** Canonical preparation item list. Always written by the new Step 3 UI. */
+  items: PrepItem[];
+  /** Legacy field groups (old format). Read-only compat — never written by new code. */
+  fields?: ExperimentField[];
+}
 
 /**
  * Step 4 — 实验操作 uses the same per-step card model as OperationStep.

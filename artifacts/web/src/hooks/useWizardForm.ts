@@ -1,14 +1,12 @@
 import { useState } from "react";
 import type { WizardFormData } from "@/types/wizardForm";
 import { getExperimentName } from "@/types/experimentFields";
-import {
-  DEFAULT_STEP2_FIELDS,
-  DEFAULT_STEP3_FIELDS,
-} from "@/data/defaultStepFields";
+import { DEFAULT_STEP2_FIELDS } from "@/data/defaultStepFields";
 
 const INITIAL: WizardFormData = {
   step2: { fields: DEFAULT_STEP2_FIELDS },
-  step3: { fields: DEFAULT_STEP3_FIELDS },
+  // Step 3 uses the PrepItem card model — starts empty, written only to items[].
+  step3: { items: [] },
   // Step 4 uses the OperationStep card model — starts empty, written only to items[].
   step4: { items: [] },
   // Step 5 uses the MeasurementItem card model — starts empty, written only to items[].

@@ -14,7 +14,7 @@ import type {
   DataItem,
 } from "@/types/ontologyModules";
 import type { ExperimentField } from "@/types/experimentFields";
-import type { WizardFormData } from "@/types/wizardForm";
+import type { WizardFormData, Step3Data } from "@/types/wizardForm";
 import { makeTag } from "@/types/experimentFields";
 
 // ---------------------------------------------------------------------------
@@ -249,15 +249,17 @@ function step2ToSystemObjects(fields: ExperimentField[]): SystemObject[] {
 // ----- Step 3 → 实验准备 -----
 
 /**
- * The field category name (e.g. "准备材料", "准备设备", "前处理事项")
- * becomes PrepItem.category — a key insight that gives free ontology
- * inheritance without any hardcoded enum.
+ * Legacy fallback — only used when a note still carries the old
+ * Step3Data.fields format (field groups like 准备材料 / 准备设备 / 前处理事项).
+ *
+ * The field group name becomes PrepItem.category — which now aligns with the
+ * updated PREP_CATEGORY options, so badges render with correct colors.
  *
  * object fields: each ObjectItem → PrepItem (name + attributes)
  * list fields:   each string   → PrepItem (name only)
  * text fields:   the value     → PrepItem (name only, if non-empty)
  */
-function step3ToPrepItems(fields: ExperimentField[]): PrepItem[] {
+function step3ToPrepItemsLegacy(fields: ExperimentField[]): PrepItem[] {
   const items: PrepItem[] = [];
 
   for (const field of fields) {
@@ -292,6 +294,17 @@ function step3ToPrepItems(fields: ExperimentField[]): PrepItem[] {
   }
 
   return items;
+}
+
+/**
+ * Converts Step3Data to PrepItem[]:
+ *   new format (items[]) → direct passthrough (zero transformation)
+ *   old format (fields)  → step3ToPrepItemsLegacy best-effort mapping
+ */
+function step3ToPrepItems(step3: Step3Data): PrepItem[] {
+  if (step3.items && step3.items.length > 0) return step3.items;
+  if (step3.fields && step3.fields.length > 0) return step3ToPrepItemsLegacy(step3.fields);
+  return [];
 }
 
 // ----- Step 4 → 实验操作 -----
@@ -527,7 +540,7 @@ function step6ToDataItems(step6: { items?: DataItem[]; fields?: ExperimentField[
 export function wizardToModules(formData: WizardFormData): OntologyModule[] {
   return [
     makeModule("system",      "实验系统", { systemObjects:    step2ToSystemObjects(formData.step2.fields)   }),
-    makeModule("preparation", "实验准备", { prepItems:        step3ToPrepItems(formData.step3.fields)       }),
+    makeModule("preparation", "实验准备", { prepItems:        step3ToPrepItems(formData.step3)              }),
     makeModule("operation",   "实验操作", { operationSteps:   step4ToOperationSteps(formData.step4)         }),
     makeModule("measurement", "测量过程", { measurementItems: step5ToMeasurementItems(formData.step5)       }),
     makeModule("data",        "实验数据", { dataItems:        step6ToDataItems(formData.step6)              }),

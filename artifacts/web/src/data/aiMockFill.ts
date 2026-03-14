@@ -61,64 +61,118 @@ export const AI_MOCK_FILL: WizardFormData = {
 
   // ── Step 3 — 实验准备 ─────────────────────────────────────────────────────
   step3: {
-    fields: [
+    items: [
+      // 准备材料
       {
-        id: "ai-s3-1", name: "准备材料", type: "object", value: "", items: [],
-        objects: [
-          { id: "s3o-1", name: "TiO₂ 纳米催化剂", tags: [
-            { id: "s3t-1", key: "用量", value: "50 mg" },
-            { id: "s3t-2", key: "纯度", value: "≥ 99%" },
-          ]},
-          { id: "s3o-2", name: "底物溶液", tags: [
-            { id: "s3t-3", key: "浓度", value: "0.1 mol/L" },
-            { id: "s3t-4", key: "体积", value: "100 mL" },
-          ]},
-          { id: "s3o-3", name: "去离子水", tags: [
-            { id: "s3t-5", key: "体积", value: "200 mL" },
-          ]},
-          { id: "s3o-4", name: "分析纯乙醇", tags: [
-            { id: "s3t-6", key: "体积", value: "50 mL" },
-          ]},
+        id: "ai-s3-1",
+        name: "TiO₂ 纳米催化剂",
+        category: "准备材料",
+        attributes: [
+          { id: "s3t-1", key: "用量", value: "50 mg" },
+          { id: "s3t-2", key: "纯度", value: "≥ 99%" },
         ],
       },
       {
-        id: "ai-s3-2", name: "准备设备", type: "object", value: "", items: [],
-        objects: [
-          { id: "s3e-1", name: "超声破碎仪", tags: [
-            { id: "s3t-7", key: "功率", value: "400 W" },
-            { id: "s3t-8", key: "预热时间", value: "5 min" },
-          ]},
-          { id: "s3e-2", name: "分析天平", tags: [
-            { id: "s3t-9", key: "精度", value: "0.0001 g" },
-          ]},
-          { id: "s3e-3", name: "磁力搅拌器", tags: [
-            { id: "s3t-10", key: "转速", value: "500 rpm" },
-          ]},
+        id: "ai-s3-2",
+        name: "底物溶液",
+        category: "准备材料",
+        attributes: [
+          { id: "s3t-3", key: "浓度", value: "0.1 mol/L" },
+          { id: "s3t-4", key: "体积", value: "100 mL" },
         ],
       },
       {
-        id: "ai-s3-3", name: "环境条件", type: "object", value: "", items: [],
-        objects: [
-          { id: "s3c-1", name: "温度", tags: [
-            { id: "s3t-11", key: "设定值", value: "25°C" },
-            { id: "s3t-12", key: "控制精度", value: "±0.5°C" },
-          ]},
-          { id: "s3c-2", name: "相对湿度", tags: [
-            { id: "s3t-13", key: "要求", value: "< 40%" },
-          ]},
-          { id: "s3c-3", name: "洁净环境", tags: [
-            { id: "s3t-14", key: "操作区域", value: "通风橱内" },
-          ]},
+        id: "ai-s3-3",
+        name: "去离子水",
+        category: "准备材料",
+        attributes: [
+          { id: "s3t-5", key: "体积", value: "200 mL" },
         ],
       },
       {
-        id: "ai-s3-4", name: "前处理事项", type: "list", value: "", objects: [],
-        items: [
-          "所有玻璃器皿需预先用去离子水清洗三次并烘干",
-          "催化剂称量后立即封存，避免吸潮",
-          "底物溶液现配现用，不超过 2 小时",
-          "确认恒温水浴已提前升温至 25°C",
+        id: "ai-s3-4",
+        name: "分析纯乙醇",
+        category: "准备材料",
+        attributes: [
+          { id: "s3t-6", key: "体积", value: "50 mL" },
         ],
+      },
+      // 准备设备
+      {
+        id: "ai-s3-5",
+        name: "超声破碎仪",
+        category: "准备设备",
+        attributes: [
+          { id: "s3t-7", key: "功率", value: "400 W" },
+          { id: "s3t-8", key: "预热时间", value: "5 min" },
+        ],
+      },
+      {
+        id: "ai-s3-6",
+        name: "分析天平",
+        category: "准备设备",
+        attributes: [
+          { id: "s3t-9", key: "精度", value: "0.0001 g" },
+        ],
+      },
+      {
+        id: "ai-s3-7",
+        name: "磁力搅拌器",
+        category: "准备设备",
+        attributes: [
+          { id: "s3t-10", key: "转速", value: "500 rpm" },
+        ],
+      },
+      // 环境条件
+      {
+        id: "ai-s3-8",
+        name: "温度",
+        category: "环境条件",
+        attributes: [
+          { id: "s3t-11", key: "设定值", value: "25°C" },
+          { id: "s3t-12", key: "控制精度", value: "±0.5°C" },
+        ],
+      },
+      {
+        id: "ai-s3-9",
+        name: "相对湿度",
+        category: "环境条件",
+        attributes: [
+          { id: "s3t-13", key: "要求", value: "< 40%" },
+        ],
+      },
+      {
+        id: "ai-s3-10",
+        name: "洁净环境",
+        category: "环境条件",
+        attributes: [
+          { id: "s3t-14", key: "操作区域", value: "通风橱内" },
+        ],
+      },
+      // 前处理事项
+      {
+        id: "ai-s3-11",
+        name: "所有玻璃器皿需预先用去离子水清洗三次并烘干",
+        category: "前处理事项",
+        attributes: [],
+      },
+      {
+        id: "ai-s3-12",
+        name: "催化剂称量后立即封存，避免吸潮",
+        category: "前处理事项",
+        attributes: [],
+      },
+      {
+        id: "ai-s3-13",
+        name: "底物溶液现配现用，不超过 2 小时",
+        category: "前处理事项",
+        attributes: [],
+      },
+      {
+        id: "ai-s3-14",
+        name: "确认恒温水浴已提前升温至 25°C",
+        category: "前处理事项",
+        attributes: [],
       },
     ],
   },
@@ -244,8 +298,8 @@ export const AI_MOCK_FILL: WizardFormData = {
         id: "ai-s6-1",
         name: "XRD 衍射峰位置与强度",
         attributes: [
-          { key: "衍射角范围", value: "20°–80°" },
-          { key: "峰值", value: "(002) 34.4°" },
+          { id: "s6t-1", key: "衍射角范围", value: "20°–80°" },
+          { id: "s6t-2", key: "峰值", value: "(002) 34.4°" },
         ],
         description: "用于确认 ZnO 薄膜的 c 轴择优取向及结晶质量",
       },
@@ -253,8 +307,8 @@ export const AI_MOCK_FILL: WizardFormData = {
         id: "ai-s6-2",
         name: "薄膜方块电阻",
         attributes: [
-          { key: "测量方法", value: "四探针法" },
-          { key: "单位", value: "Ω/□" },
+          { id: "s6t-3", key: "测量方法", value: "四探针法" },
+          { id: "s6t-4", key: "单位", value: "Ω/□" },
         ],
         description: "评估不同退火温度下 ZnO 导电性的变化趋势",
       },
@@ -262,8 +316,8 @@ export const AI_MOCK_FILL: WizardFormData = {
         id: "ai-s6-3",
         name: "薄膜表面形貌",
         attributes: [
-          { key: "表征手段", value: "SEM" },
-          { key: "放大倍率", value: "50k×" },
+          { id: "s6t-5", key: "表征手段", value: "SEM" },
+          { id: "s6t-6", key: "放大倍率", value: "50k×" },
         ],
         description: "观察晶粒尺寸与表面粗糙度随退火温度的演变",
       },

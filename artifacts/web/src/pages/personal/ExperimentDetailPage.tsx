@@ -5,8 +5,9 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
 import type { ExperimentField, ObjectItem } from "@/types/experimentFields";
 import { getExperimentName } from "@/types/experimentFields";
-import type { MeasurementItem, DataItem, OperationStep } from "@/types/ontologyModules";
-import type { Step4Data, Step5Data, Step6Data } from "@/types/wizardForm";
+import type { MeasurementItem, DataItem, OperationStep, PrepItem } from "@/types/ontologyModules";
+import type { Step3Data, Step4Data, Step5Data, Step6Data } from "@/types/wizardForm";
+import { PREP_CATEGORY } from "@/config/ontologyOptions";
 
 // ---------------------------------------------------------------------------
 // Read-only ObjectItem card (mirrors ObjectItemCard's visual style)
@@ -111,6 +112,69 @@ function StepSection({ title, fields }: StepSectionProps) {
       </div>
     </section>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Step3Section — read-only view for 实验准备 (new card format)
+// Handles both new (items[]) and legacy (fields[]) step3 data.
+// ---------------------------------------------------------------------------
+
+function PrepItemSummary({ item }: { item: PrepItem }) {
+  const catColor =
+    PREP_CATEGORY.colors[item.category] ?? "bg-gray-100 text-gray-500 border-gray-200";
+  return (
+    <div className="bg-white rounded-lg border border-gray-100 px-3 py-2 flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span
+          className={[
+            "text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap flex-shrink-0",
+            catColor,
+          ].join(" ")}
+        >
+          {item.category}
+        </span>
+        <p className="text-sm font-medium text-gray-800 leading-snug truncate">
+          {item.name || "—"}
+        </p>
+      </div>
+      {item.attributes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {item.attributes.map((tag) => (
+            <span
+              key={tag.id}
+              className="inline-block bg-slate-100 text-slate-600 text-xs rounded-full px-2.5 py-0.5"
+            >
+              {tag.value ? `${tag.key}: ${tag.value}` : tag.key}
+            </span>
+          ))}
+        </div>
+      )}
+      {item.description && (
+        <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
+      )}
+    </div>
+  );
+}
+
+function Step3Section({ step3 }: { step3: Step3Data }) {
+  // New format: items[]
+  if (step3.items && step3.items.length > 0) {
+    return (
+      <section>
+        <h2 className="text-sm font-semibold text-gray-500 mb-3">实验准备</h2>
+        <div className="flex flex-col gap-2">
+          {step3.items.map((item) => (
+            <PrepItemSummary key={item.id} item={item} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+  // Legacy format: fields[]
+  if (step3.fields && step3.fields.length > 0) {
+    return <StepSection title="实验准备" fields={step3.fields} />;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +402,7 @@ export function ExperimentDetailPage() {
         {fd && (
           <>
             <StepSection title="实验系统" fields={fd.step2.fields} />
-            <StepSection title="实验准备" fields={fd.step3.fields} />
+            <Step3Section step3={fd.step3} />
             <Step4Section step4={fd.step4} />
             <Step5Section step5={fd.step5} />
             <Step6Section step6={fd.step6} />
