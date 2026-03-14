@@ -194,7 +194,7 @@ export function OperationStepViewCard({
           <button
             type="button"
             onClick={onEdit}
-            className="text-xs text-gray-400 leading-relaxed text-left hover:text-gray-600 transition-colors w-full"
+            className="text-xs text-gray-500 leading-relaxed text-left hover:text-gray-700 transition-colors w-full"
           >
             {step.notes}
           </button>

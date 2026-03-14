@@ -90,7 +90,7 @@ export function Step5MeasurementEditor({ items, onChange }: Props) {
     <div className="flex flex-col gap-2.5">
       {items.length === 0 && !pendingNew && (
         <p className="text-sm text-gray-400 text-center py-4 border border-dashed border-gray-200 rounded-xl">
-          尚未添加测量项，点击下方"新增测量项"开始
+          暂无测量项，点击"新增测量项"开始添加
         </p>
       )}
 

@@ -180,7 +180,7 @@ export function DataItemViewCard({
         <button
           type="button"
           onClick={onEdit}
-          className="px-3 pb-2.5 text-xs text-gray-400 leading-relaxed text-left hover:text-gray-600 transition-colors w-full"
+          className="px-3 pb-2.5 text-xs text-gray-500 leading-relaxed text-left hover:text-gray-700 transition-colors w-full"
         >
           {item.description}
         </button>

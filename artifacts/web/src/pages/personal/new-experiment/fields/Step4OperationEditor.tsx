@@ -96,7 +96,7 @@ export function Step4OperationEditor({ items, onChange }: Props) {
     <div className="flex flex-col gap-2.5">
       {items.length === 0 && !pendingNew && (
         <p className="text-sm text-gray-400 py-2 text-center">
-          尚未添加操作步骤，点击下方"新增步骤"开始
+          暂无操作步骤，点击"新增步骤"开始添加
         </p>
       )}
 

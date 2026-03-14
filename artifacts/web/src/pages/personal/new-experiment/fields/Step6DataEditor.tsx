@@ -88,7 +88,7 @@ export function Step6DataEditor({ items, onChange }: Props) {
     <div className="flex flex-col gap-2.5">
       {items.length === 0 && !pendingNew && (
         <p className="text-sm text-gray-400 py-2 text-center">
-          尚未添加数据项，点击下方"新增数据项"开始
+          暂无数据项，点击"新增数据项"开始添加
         </p>
       )}
 
