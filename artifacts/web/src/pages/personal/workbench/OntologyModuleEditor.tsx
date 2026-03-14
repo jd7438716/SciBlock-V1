@@ -14,7 +14,7 @@
  *   实验准备    → PreparationModuleEditor
  *   实验操作    → OperationModuleEditor
  *   测量过程    → MeasurementModuleEditor
- *   实验数据    → DataModuleView (view + inline add, next phase for full editor)
+ *   实验数据    → DataModuleEditor
  */
 
 import React from "react";
@@ -27,7 +27,7 @@ import { SystemModuleEditor } from "./modules/SystemModuleEditor";
 import { PreparationModuleEditor } from "./modules/PreparationModuleEditor";
 import { OperationModuleEditor } from "./modules/OperationModuleEditor";
 import { MeasurementModuleEditor } from "./modules/MeasurementModuleEditor";
-import { DataModuleView } from "./modules/DataModuleView";
+import { DataModuleEditor } from "./modules/DataModuleEditor";
 
 // ---------------------------------------------------------------------------
 // Module content dispatcher
@@ -73,11 +73,9 @@ function ModuleBody({ module, onUpdate }: BodyProps) {
       );
     case "data":
       return (
-        <DataModuleView
+        <DataModuleEditor
           items={sd.dataItems ?? []}
-          onAdd={() => {
-            /* DataModuleEditor planned for next phase */
-          }}
+          onUpdate={(items) => onUpdate({ dataItems: items })}
         />
       );
     default:
