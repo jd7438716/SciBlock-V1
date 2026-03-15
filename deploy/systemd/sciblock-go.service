@@ -1,0 +1,62 @@
+# =============================================================================
+# SciBlock Go API — systemd service unit
+# =============================================================================
+# 用途：守护 Go API 二进制进程，自动重启，日志交由 systemd journal 管理。
+#
+# 安装方式：
+#   sudo cp deploy/systemd/sciblock-go.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable sciblock-go
+#   sudo systemctl start sciblock-go
+#
+# 日志查看：
+#   sudo journalctl -u sciblock-go -f
+#   sudo journalctl -u sciblock-go --since "1 hour ago"
+# =============================================================================
+
+[Unit]
+Description=SciBlock Go API Server
+Documentation=file:///opt/sciblock/app/docs/deployment.md
+
+# PostgreSQL 必须先启动，Go API 才能建立数据库连接。
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=sciblock
+Group=sciblock
+
+# 工作目录设为 Go 二进制所在目录，相对路径（如 ./migrations）由此解析。
+WorkingDirectory=/opt/sciblock/app/artifacts/go-api
+
+# 环境变量从独立文件加载，该文件不纳入版本控制。
+# 文件权限应为 600，owner 为 sciblock。
+EnvironmentFile=/opt/sciblock/env/production.env
+
+# Go 二进制路径（构建产物）。
+# 由 sh scripts/build.sh go 生成，输出到 artifacts/go-api/bin/server。
+ExecStart=/opt/sciblock/app/artifacts/go-api/bin/server
+
+# 进程退出后 5 秒自动重启（覆盖瞬时故障）。
+Restart=always
+RestartSec=5
+
+# 对 PostgreSQL 连接失败（启动时 DB 未就绪）保持容忍，最多重试 3 分钟。
+StartLimitIntervalSec=180
+StartLimitBurst=10
+
+# 日志输出到 systemd journal（用 journalctl 查看，不写文件）。
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sciblock-go
+
+# 安全加固：不允许该进程写 /etc、/usr、/boot。
+ProtectSystem=full
+# 不允许访问 /home。
+ProtectHome=true
+# 只允许必要的系统调用（可按需收紧）。
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

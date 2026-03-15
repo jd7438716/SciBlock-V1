@@ -1,0 +1,120 @@
+# =============================================================================
+# SciBlock — Nginx Virtual Host Configuration Template
+# =============================================================================
+# 用途：Nginx 反向代理配置，负责：
+#   1. 将域名根路径 / 映射到前端静态构建产物
+#   2. 将 /api/ 代理到 Express API（8080）
+#   3. Express 内部再将 Go 路由代理到 Go API（8082）——Nginx 无需感知 Go
+#
+# 安装方式：
+#   sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/sciblock
+#   # 编辑文件，将所有 CHANGE_ME 替换为实际域名
+#   sudo ln -s /etc/nginx/sites-available/sciblock /etc/nginx/sites-enabled/
+#   sudo nginx -t
+#   sudo systemctl reload nginx
+#
+# HTTPS 配置（生产必须）：
+#   sudo apt install certbot python3-certbot-nginx
+#   sudo certbot --nginx -d your-domain.example.com
+#   sudo certbot renew --dry-run
+#
+# 流量路径：
+#   Internet
+#      │ 443 HTTPS
+#      ▼
+#    Nginx
+#      ├── /           → 静态文件  /opt/sciblock/app/artifacts/web/dist/public/
+#      └── /api/       → Express  127.0.0.1:8080
+#                            └── (内部代理)
+#                                ├── /api/auth/login,me,logout → Go 127.0.0.1:8082
+#                                ├── /api/scinotes/**          → Go 127.0.0.1:8082
+#                                ├── /api/experiments/**       → Go 127.0.0.1:8082
+#                                └── 其余 /api/**              → Express 自处理
+# =============================================================================
+
+# HTTP → HTTPS 重定向（certbot 配置 TLS 后自动生成，此处保留为参考）
+server {
+    listen 80;
+    listen [::]:80;
+
+    # ── 替换为实际域名 ───────────────────────────────────────────────────────
+    server_name CHANGE_ME;  # 示例: app.example.com
+
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS 主配置
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+
+    # ── 替换为实际域名 ───────────────────────────────────────────────────────
+    server_name CHANGE_ME;  # 示例: app.example.com
+
+    # TLS 证书（certbot 自动填写，手动部署时替换路径）
+    ssl_certificate     /etc/letsencrypt/live/CHANGE_ME/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/CHANGE_ME/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # ── 访问日志 ─────────────────────────────────────────────────────────────
+    access_log /var/log/nginx/sciblock.access.log;
+    error_log  /var/log/nginx/sciblock.error.log warn;
+
+    # ── 前端静态文件 — React SPA ─────────────────────────────────────────────
+    # 构建产物由 sh scripts/build.sh web 生成，输出到 artifacts/web/dist/public/
+    root  /opt/sciblock/app/artifacts/web/dist/public;
+    index index.html;
+
+    location / {
+        # 先查文件，再查目录，都没有则回落到 index.html（支持前端路由）。
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 带哈希的静态资源（JS/CSS bundle）长期缓存；index.html 禁止缓存。
+    location ~* \.(js|css|woff|woff2|ttf|eot|svg|png|jpg|jpeg|gif|ico|webp)$ {
+        expires     30d;
+        add_header  Cache-Control "public, immutable";
+        # 文件不存在时不回落到 index.html（静态资源直接 404）。
+        try_files   $uri =404;
+    }
+
+    # index.html 禁止缓存，保证前端更新后立即生效。
+    location = /index.html {
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+    }
+
+    # ── Express API 反向代理 ─────────────────────────────────────────────────
+    # 全部 /api/ 流量转发到 Express（8080）。
+    # Express 内部再将 Go 路由代理到 Go API（8082）；Nginx 无需知道 Go。
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+
+        # 传递真实客户端信息（Express 日志和 rate-limit 依赖这些 header）。
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 保留 Connection header（未来 WebSocket 升级所需）。
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # 超时设置（登录、报告生成等操作时间较长，保持 30s）。
+        proxy_connect_timeout 5s;
+        proxy_send_timeout    30s;
+        proxy_read_timeout    30s;
+
+        # Express 不可达时返回 502 而非 Nginx 默认错误页。
+        proxy_next_upstream error timeout;
+    }
+
+    # ── 安全响应头 ───────────────────────────────────────────────────────────
+    add_header X-Frame-Options        "SAMEORIGIN"                    always;
+    add_header X-Content-Type-Options "nosniff"                       always;
+    add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+
+    # 请求体大小限制（文件上传场景按需调大）。
+    client_max_body_size 10m;
+}

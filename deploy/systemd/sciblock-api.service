@@ -1,0 +1,65 @@
+# =============================================================================
+# SciBlock Express API — systemd service unit
+# =============================================================================
+# 用途：守护 Express API 服务器（Node.js），自动重启，日志交由 systemd journal 管理。
+#
+# 安装方式：
+#   sudo cp deploy/systemd/sciblock-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable sciblock-api
+#   sudo systemctl start sciblock-api
+#
+# 日志查看：
+#   sudo journalctl -u sciblock-api -f
+#   sudo journalctl -u sciblock-api --since "1 hour ago"
+# =============================================================================
+
+[Unit]
+Description=SciBlock Express API Server
+Documentation=file:///opt/sciblock/app/docs/deployment.md
+
+# Go API 必须先启动，Express 代理层才有上游可用。
+After=network.target sciblock-go.service
+Wants=sciblock-go.service
+
+[Service]
+Type=simple
+User=sciblock
+Group=sciblock
+
+# 工作目录设为 Express 构建产物目录。
+# dist/index.cjs 由 sh scripts/build.sh api 生成。
+WorkingDirectory=/opt/sciblock/app/artifacts/api-server
+
+# 从共享的环境变量文件加载配置。
+# 文件权限应为 600，owner 为 sciblock。
+EnvironmentFile=/opt/sciblock/env/production.env
+
+# 覆盖 production.env 中 Go API 使用的 PORT=8082。
+# Express 监听 8080，Nginx 将 /api/ 代理到此端口。
+# 此行必须保留，否则 Express 与 Go API 会争用同一端口。
+Environment="PORT=8080"
+
+# Express 生产启动命令。
+# 注意：使用 node 全路径，避免 PATH 在 systemd 环境中未完整加载。
+ExecStart=/usr/bin/node dist/index.cjs
+
+# 进程退出后 5 秒自动重启。
+Restart=always
+RestartSec=5
+
+StartLimitIntervalSec=180
+StartLimitBurst=10
+
+# 日志输出到 systemd journal。
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sciblock-api
+
+# 安全加固。
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
