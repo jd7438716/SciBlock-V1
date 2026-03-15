@@ -1,0 +1,269 @@
+package repository
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"sciblock/go-api/internal/domain"
+)
+
+type pgxExperimentRepository struct {
+	pool *pgxpool.Pool
+}
+
+// NewExperimentRepository returns a pgx-backed ExperimentRepository.
+func NewExperimentRepository(pool *pgxpool.Pool) ExperimentRepository {
+	return &pgxExperimentRepository{pool: pool}
+}
+
+const expColumns = `
+	id, sci_note_id, title, purpose_input,
+	experiment_status, experiment_code, tags,
+	editor_content, report_html, current_modules,
+	inherited_version_id, is_deleted, created_at, updated_at`
+
+// ListBySciNote returns ExperimentRecords for a SciNote.
+// trashOnly=false → is_deleted=false (normal view)
+// trashOnly=true  → is_deleted=true  (trash view)
+func (r *pgxExperimentRepository) ListBySciNote(ctx context.Context, sciNoteID string, trashOnly bool) ([]domain.ExperimentRecord, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT`+expColumns+`
+		 FROM experiment_records
+		 WHERE sci_note_id = $1 AND is_deleted = $2
+		 ORDER BY created_at DESC`,
+		sciNoteID, trashOnly,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ListBySciNote query: %w", err)
+	}
+	defer rows.Close()
+
+	var recs []domain.ExperimentRecord
+	for rows.Next() {
+		rec, err := scanExperiment(rows)
+		if err != nil {
+			return nil, fmt.Errorf("ListBySciNote scan: %w", err)
+		}
+		recs = append(recs, *rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ListBySciNote rows: %w", err)
+	}
+	if recs == nil {
+		recs = []domain.ExperimentRecord{}
+	}
+	return recs, nil
+}
+
+// GetByID retrieves a single ExperimentRecord by primary key.
+// Returns nil, nil when not found.
+func (r *pgxExperimentRepository) GetByID(ctx context.Context, id string) (*domain.ExperimentRecord, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT`+expColumns+`
+		 FROM experiment_records WHERE id = $1`,
+		id,
+	)
+	rec, err := scanExperiment(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("GetByID: %w", err)
+	}
+	return rec, nil
+}
+
+// Create inserts a new ExperimentRecord and returns the persisted row.
+func (r *pgxExperimentRepository) Create(ctx context.Context, rec domain.ExperimentRecord) (*domain.ExperimentRecord, error) {
+	tags := rec.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
+	row := r.pool.QueryRow(ctx,
+		`INSERT INTO experiment_records
+			(id, sci_note_id, title, purpose_input,
+			 experiment_status, experiment_code, tags,
+			 editor_content, report_html, current_modules, inherited_version_id)
+		 VALUES
+			(gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		 RETURNING`+expColumns,
+		rec.SciNoteID,
+		rec.Title,
+		rec.PurposeInput,
+		rec.ExperimentStatus,
+		rec.ExperimentCode,
+		tags,
+		rec.EditorContent,
+		rec.ReportHtml,
+		nullableJSON(rec.CurrentModules),
+		rec.InheritedVersionID,
+	)
+	created, err := scanExperiment(row)
+	if err != nil {
+		return nil, fmt.Errorf("Create: %w", err)
+	}
+	return created, nil
+}
+
+// Update applies a partial patch; only non-nil/non-zero fields are written.
+// patch.CurrentModules non-nil replaces the whole current_modules column.
+func (r *pgxExperimentRepository) Update(ctx context.Context, id string, patch domain.ExperimentPatch) (*domain.ExperimentRecord, error) {
+	setClauses := []string{"updated_at = now()"}
+	args := []any{}
+	argIdx := 1
+
+	if patch.Title != nil {
+		setClauses = append(setClauses, fmt.Sprintf("title = $%d", argIdx))
+		args = append(args, *patch.Title)
+		argIdx++
+	}
+	if patch.ExperimentStatus != nil {
+		setClauses = append(setClauses, fmt.Sprintf("experiment_status = $%d", argIdx))
+		args = append(args, *patch.ExperimentStatus)
+		argIdx++
+	}
+	if patch.ExperimentCode != nil {
+		setClauses = append(setClauses, fmt.Sprintf("experiment_code = $%d", argIdx))
+		args = append(args, *patch.ExperimentCode)
+		argIdx++
+	}
+	// Tags: nil = no change; empty slice = clear to {}
+	if patch.Tags != nil {
+		setClauses = append(setClauses, fmt.Sprintf("tags = $%d", argIdx))
+		args = append(args, patch.Tags)
+		argIdx++
+	}
+	if patch.EditorContent != nil {
+		setClauses = append(setClauses, fmt.Sprintf("editor_content = $%d", argIdx))
+		args = append(args, *patch.EditorContent)
+		argIdx++
+	}
+	if patch.ReportHtml != nil {
+		setClauses = append(setClauses, fmt.Sprintf("report_html = $%d", argIdx))
+		args = append(args, *patch.ReportHtml)
+		argIdx++
+	}
+	if len(patch.CurrentModules) > 0 {
+		setClauses = append(setClauses, fmt.Sprintf("current_modules = $%d", argIdx))
+		args = append(args, []byte(patch.CurrentModules))
+		argIdx++
+	}
+
+	if len(setClauses) == 1 {
+		return r.GetByID(ctx, id)
+	}
+
+	args = append(args, id)
+	query := fmt.Sprintf(
+		`UPDATE experiment_records SET %s WHERE id = $%d RETURNING`+expColumns,
+		strings.Join(setClauses, ", "),
+		argIdx,
+	)
+
+	row := r.pool.QueryRow(ctx, query, args...)
+	updated, err := scanExperiment(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("Update: %w", err)
+	}
+	return updated, nil
+}
+
+// UpdateModules replaces the current_modules column wholesale.
+func (r *pgxExperimentRepository) UpdateModules(ctx context.Context, id string, modules json.RawMessage) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE experiment_records SET current_modules = $1, updated_at = now() WHERE id = $2`,
+		[]byte(modules), id,
+	)
+	if err != nil {
+		return fmt.Errorf("UpdateModules: %w", err)
+	}
+	return nil
+}
+
+// SoftDelete sets is_deleted=true.
+func (r *pgxExperimentRepository) SoftDelete(ctx context.Context, id string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE experiment_records SET is_deleted = true, updated_at = now() WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("SoftDelete: %w", err)
+	}
+	return nil
+}
+
+// Restore sets is_deleted=false.
+func (r *pgxExperimentRepository) Restore(ctx context.Context, id string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE experiment_records SET is_deleted = false, updated_at = now() WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("Restore: %w", err)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Scan helpers
+// ---------------------------------------------------------------------------
+
+type expScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanExperiment(row expScanner) (*domain.ExperimentRecord, error) {
+	var (
+		id                 string
+		sciNoteID          string
+		title              string
+		purposeInput       *string
+		experimentStatus   string
+		experimentCode     string
+		tags               []string
+		editorContent      string
+		reportHtml         *string
+		currentModules     []byte
+		inheritedVersionID *string
+		isDeleted          bool
+		createdAt          time.Time
+		updatedAt          time.Time
+	)
+	if err := row.Scan(
+		&id, &sciNoteID, &title, &purposeInput,
+		&experimentStatus, &experimentCode, &tags,
+		&editorContent, &reportHtml, &currentModules,
+		&inheritedVersionID, &isDeleted, &createdAt, &updatedAt,
+	); err != nil {
+		return nil, err
+	}
+	if tags == nil {
+		tags = []string{}
+	}
+	return &domain.ExperimentRecord{
+		ID:                 id,
+		SciNoteID:          sciNoteID,
+		Title:              title,
+		PurposeInput:       purposeInput,
+		ExperimentStatus:   experimentStatus,
+		ExperimentCode:     experimentCode,
+		Tags:               tags,
+		EditorContent:      editorContent,
+		ReportHtml:         reportHtml,
+		CurrentModules:     jsonOrNil(currentModules),
+		InheritedVersionID: inheritedVersionID,
+		IsDeleted:          isDeleted,
+		CreatedAt:          createdAt,
+		UpdatedAt:          updatedAt,
+	}, nil
+}

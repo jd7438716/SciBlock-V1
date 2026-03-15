@@ -21,13 +21,14 @@ func NewExperimentHandler(svc *service.ExperimentService) *ExperimentHandler {
 	return &ExperimentHandler{svc: svc}
 }
 
-// ListBySciNote handles GET /api/scinotes/:id/records.
+// ListBySciNote handles GET /api/scinotes/:id/experiments
+// Query param: ?deleted=true → return trash (soft-deleted) records.
 func (h *ExperimentHandler) ListBySciNote(w http.ResponseWriter, r *http.Request) {
 	sciNoteID := chi.URLParam(r, "id")
 	claims := middleware.ClaimsFromContext(r.Context())
-	deleted := r.URL.Query().Get("deleted") == "true"
+	trashOnly := r.URL.Query().Get("deleted") == "true"
 
-	records, err := h.svc.List(r.Context(), sciNoteID, claims.UserID, deleted)
+	records, err := h.svc.List(r.Context(), sciNoteID, claims.UserID, trashOnly)
 	if err != nil {
 		mapServiceError(w, err)
 		return
@@ -40,7 +41,7 @@ func (h *ExperimentHandler) ListBySciNote(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, dto.ListExperimentsResponse{Items: items, Total: len(items)})
 }
 
-// Create handles POST /api/scinotes/:id/records.
+// Create handles POST /api/scinotes/:id/experiments
 func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	sciNoteID := chi.URLParam(r, "id")
 	claims := middleware.ClaimsFromContext(r.Context())
@@ -79,7 +80,7 @@ func (h *ExperimentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, domainExpToDTO(created))
 }
 
-// Get handles GET /api/experiments/:id.
+// Get handles GET /api/experiments/:id
 func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	claims := middleware.ClaimsFromContext(r.Context())
@@ -92,7 +93,8 @@ func (h *ExperimentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, domainExpToDTO(rec))
 }
 
-// Update handles PATCH /api/experiments/:id.
+// Update handles PATCH /api/experiments/:id
+// Supports all scalar fields plus currentModules (whole-column replacement).
 func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	claims := middleware.ClaimsFromContext(r.Context())
@@ -110,6 +112,7 @@ func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Tags:             req.Tags,
 		EditorContent:    req.EditorContent,
 		ReportHtml:       req.ReportHtml,
+		CurrentModules:   req.CurrentModules,
 	}
 
 	updated, err := h.svc.Update(r.Context(), id, patch, claims.UserID)
@@ -120,30 +123,7 @@ func (h *ExperimentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, domainExpToDTO(updated))
 }
 
-// UpdateModule handles PATCH /api/experiments/:id/modules/:key.
-func (h *ExperimentHandler) UpdateModule(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	key := chi.URLParam(r, "key")
-	claims := middleware.ClaimsFromContext(r.Context())
-
-	var req dto.UpdateModuleRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "Request body must be valid JSON")
-		return
-	}
-	if len(req.Module) == 0 {
-		writeError(w, http.StatusBadRequest, "validation_error", "module is required")
-		return
-	}
-
-	if err := h.svc.UpdateModule(r.Context(), id, key, req.Module, claims.UserID); err != nil {
-		mapServiceError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// SoftDelete handles DELETE /api/experiments/:id.
+// SoftDelete handles DELETE /api/experiments/:id
 func (h *ExperimentHandler) SoftDelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	claims := middleware.ClaimsFromContext(r.Context())
@@ -155,7 +135,7 @@ func (h *ExperimentHandler) SoftDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Restore handles PATCH /api/experiments/:id/restore.
+// Restore handles PATCH /api/experiments/:id/restore
 func (h *ExperimentHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	claims := middleware.ClaimsFromContext(r.Context())
