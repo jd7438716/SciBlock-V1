@@ -17,6 +17,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { studentsTable, papersTable, weeklyReportsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { requireInstructor } from "../middleware/requireAuth";
 
 const router: IRouter = Router();
 
@@ -154,7 +155,7 @@ router.get("/members", async (_req, res) => {
   }
 });
 
-router.post("/members", async (req, res) => {
+router.post("/members", requireInstructor, async (req, res) => {
   const { name, email, phone, enrollmentYear, degree, researchTopic } = req.body as {
     name?: string;
     email?: string;
@@ -192,7 +193,7 @@ router.get("/members/:id", async (req, res) => {
   }
 });
 
-router.patch("/members/:id", async (req, res) => {
+router.patch("/members/:id", requireInstructor, async (req, res) => {
   const { name, phone, email, enrollmentYear, degree, researchTopic, status } = req.body as {
     name?: string; phone?: string; email?: string;
     enrollmentYear?: number; degree?: string; researchTopic?: string;
@@ -208,11 +209,12 @@ router.patch("/members/:id", async (req, res) => {
   if (researchTopic !== undefined) patch.researchTopic = researchTopic;
   if (status !== undefined) patch.status = status;
 
+  const memberId = req.params["id"] as string;
   try {
     const [updated] = await db
       .update(studentsTable)
       .set(patch)
-      .where(eq(studentsTable.id, req.params.id))
+      .where(eq(studentsTable.id, memberId))
       .returning();
     if (!updated) { res.status(404).json({ error: "not_found" }); return; }
     res.json({ student: updated });
@@ -236,7 +238,7 @@ router.get("/members/:id/papers", async (req, res) => {
   }
 });
 
-router.post("/members/:id/papers", async (req, res) => {
+router.post("/members/:id/papers", requireInstructor, async (req, res) => {
   const { title, journal, year, abstract, doi, fileName, isThesis } = req.body as {
     title?: string; journal?: string; year?: number; abstract?: string;
     doi?: string; fileName?: string; isThesis?: boolean;
@@ -244,10 +246,11 @@ router.post("/members/:id/papers", async (req, res) => {
 
   if (!title) { res.status(400).json({ error: "bad_request", message: "论文标题必填" }); return; }
 
+  const studentId = req.params["id"] as string;
   try {
     const [paper] = await db
       .insert(papersTable)
-      .values({ studentId: req.params.id, title, journal: journal ?? null, year: year ?? null, abstract: abstract ?? null, doi: doi ?? null, fileName: fileName ?? null, isThesis: isThesis ?? false })
+      .values({ studentId, title, journal: journal ?? null, year: year ?? null, abstract: abstract ?? null, doi: doi ?? null, fileName: fileName ?? null, isThesis: isThesis ?? false })
       .returning();
     res.status(201).json({ paper });
   } catch (err) {
@@ -256,9 +259,10 @@ router.post("/members/:id/papers", async (req, res) => {
   }
 });
 
-router.delete("/members/:id/papers/:paperId", async (req, res) => {
+router.delete("/members/:id/papers/:paperId", requireInstructor, async (req, res) => {
+  const paperId = req.params["paperId"] as string;
   try {
-    await db.delete(papersTable).where(eq(papersTable.id, req.params.paperId));
+    await db.delete(papersTable).where(eq(papersTable.id, paperId));
     res.json({ success: true });
   } catch (err) {
     console.error("[team] DELETE paper error:", err);
@@ -280,17 +284,18 @@ router.get("/members/:id/reports", async (req, res) => {
   }
 });
 
-router.post("/members/:id/reports", async (req, res) => {
+router.post("/members/:id/reports", requireInstructor, async (req, res) => {
   const { title, content, weekStart } = req.body as {
     title?: string; content?: string; weekStart?: string;
   };
 
   if (!title || !weekStart) { res.status(400).json({ error: "bad_request", message: "标题和周次必填" }); return; }
 
+  const studentId = req.params["id"] as string;
   try {
     const [report] = await db
       .insert(weeklyReportsTable)
-      .values({ studentId: req.params.id, title, content: content ?? "", weekStart })
+      .values({ studentId, title, content: content ?? "", weekStart })
       .returning();
     res.status(201).json({ report });
   } catch (err) {

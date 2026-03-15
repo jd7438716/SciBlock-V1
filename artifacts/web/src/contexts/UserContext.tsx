@@ -4,10 +4,9 @@
  * Layer: context (singleton, wraps the entire authenticated app)
  *
  * 职责:
- *   - 登录后将 {id, email, name} 存入 localStorage，刷新后自动恢复
- *   - 提供 setCurrentUser / clearCurrentUser 给 useLogin hook 调用
- *   - 其他模块（如 messages API）可通过 getCurrentUserId() 直接读 localStorage，
- *     无需注入此 context（避免 prop-drilling）
+ *   - 登录后将用户信息存入 localStorage，刷新后自动恢复
+ *   - 提供 setCurrentUser / clearCurrentUser 给登录/登出流程调用
+ *   - clearCurrentUser 同时清除 JWT token（通过 clearSession()）
  */
 
 import React, {
@@ -18,6 +17,7 @@ import React, {
   type ReactNode,
 } from "react";
 import type { User } from "../types/auth";
+import { clearSession } from "../api/client";
 
 const STORAGE_KEY = "sciblock:currentUser";
 
@@ -65,7 +65,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearCurrentUser = useCallback(() => {
-    writeStoredUser(null);
+    // clearSession removes both sciblock:token and sciblock:currentUser.
+    clearSession();
     setCurrentUserState(null);
   }, []);
 

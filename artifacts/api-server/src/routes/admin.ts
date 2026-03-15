@@ -1,10 +1,10 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
-function requireAdminSecret(req: Parameters<Parameters<typeof router.use>[0]>[0], res: Parameters<Parameters<typeof router.use>[0]>[1], next: Parameters<Parameters<typeof router.use>[0]>[2]) {
+function requireAdminSecret(req: Request, res: Response, next: NextFunction) {
   const secret = process.env["ADMIN_SECRET"];
   const provided = req.headers["x-admin-secret"];
 

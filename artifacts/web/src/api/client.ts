@@ -1,10 +1,16 @@
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 // ---------------------------------------------------------------------------
-// Token storage helpers
+// Storage keys
 // ---------------------------------------------------------------------------
 
-const TOKEN_KEY = "sciblock:token";
+const TOKEN_KEY    = "sciblock:token";
+const USER_KEY     = "sciblock:currentUser";
+const LOGIN_PATH   = `${BASE}/login`;
+
+// ---------------------------------------------------------------------------
+// Token storage helpers
+// ---------------------------------------------------------------------------
 
 export function getStoredToken(): string | null {
   try {
@@ -25,6 +31,23 @@ export function setStoredToken(token: string): void {
 export function clearStoredToken(): void {
   try {
     localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Session clearance
+//
+// Removes all authentication state from localStorage so that on the next
+// page load the app starts in a fully unauthenticated state.
+// Call this from logout flows AND from the 401 handler below.
+// ---------------------------------------------------------------------------
+
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   } catch {
     // ignore
   }
@@ -56,8 +79,10 @@ export class ApiError extends Error {
  * The backend (Go for scinotes/experiments, Express for messages/reports/team)
  * extracts the user ID from the JWT claims server-side.
  *
- * X-User-Id is no longer sent — it was a forgeable stopgap. If you see a
- * caller adding X-User-Id manually, that is a bug and should be removed.
+ * 401 handling: clears the session and redirects to the login page.
+ * All other non-2xx responses throw ApiError which callers may handle.
+ *
+ * X-User-Id is no longer sent — it was a forgeable stopgap.
  */
 export async function apiFetch<T>(
   path: string,
@@ -78,11 +103,22 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(
+    const err = new ApiError(
       res.status,
       body.message ?? "Request failed",
       body.error,
     );
+
+    // 401: token is absent, expired, or invalid.
+    // Clear both auth keys and redirect to login — do this AFTER constructing
+    // the error so callers that catch synchronously still get the ApiError,
+    // then the navigation fires.
+    if (res.status === 401 && !window.location.pathname.endsWith("/login")) {
+      clearSession();
+      window.location.assign(LOGIN_PATH);
+    }
+
+    throw err;
   }
 
   return res.json() as Promise<T>;

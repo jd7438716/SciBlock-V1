@@ -96,3 +96,30 @@ export async function requireAuth(
     res.status(401).json({ error: "unauthorized", message: "Invalid or expired token" });
   }
 }
+
+// ---------------------------------------------------------------------------
+// requireInstructor
+//
+// Must be applied AFTER requireAuth in the middleware chain.
+// Rejects requests from non-instructor accounts with 403.
+//
+// Used to protect write operations on team and report data where
+// the schema has no per-user ownership field (studentsTable and
+// weeklyReportsTable have no userId foreign key to usersTable).
+// Without this guard, any authenticated user can mutate any record.
+// ---------------------------------------------------------------------------
+
+export function requireInstructor(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (res.locals.role !== "instructor") {
+    res.status(403).json({
+      error: "forbidden",
+      message: "This action requires instructor access",
+    });
+    return;
+  }
+  next();
+}
