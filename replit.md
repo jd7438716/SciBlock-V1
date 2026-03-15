@@ -26,11 +26,12 @@ The project is a pnpm monorepo with `artifacts/` (deployable services) and `lib/
 - **Routing**: Wouter
 - **State**: React Context (`SciNoteStoreContext`, `UserContext`, `TrashContext`, etc.)
 - **UI**: shadcn/ui primitives + Tailwind CSS
-- **API client**: `src/api/` — `client.ts` (apiFetch + token helpers), `auth.ts`, `scinotes.ts`
+- **API client**: `src/api/` — `client.ts` (apiFetch + token helpers), `auth.ts`, `scinotes.ts`, `experiments.ts`
 - **Auth**: JWT stored in `localStorage["sciblock:token"]`; injected as `Authorization: Bearer <token>` on every API call
 - **Base path**: `BASE_PATH` env var (defaults to `/`); injected by Replit at runtime
 - **Port**: `PORT` env var (default 22333)
 - **SciNote persistence**: API-first (Go backend); localStorage fallback when API unavailable
+- **Experiment persistence**: API-first (Go backend); sessionStorage as cache/fallback. `WorkbenchContext` bootstraps from `GET /api/scinotes/:id/experiments` on mount; all mutations (create, title, status, tags, editor, modules, trash, restore) go to the Go API. PATCH calls are guarded by `isServerId()` to skip temp-ID records not yet promoted to the server.
 
 ## Express API Server (`artifacts/api-server`)
 
