@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useReferences } from "./useReferences";
 import { useWizardForm, type UseWizardFormResult } from "./useWizardForm";
 import { useAiAnalysis, type UseAiAnalysisResult } from "./useAiAnalysis";
-import { AI_MOCK_FILL } from "@/data/aiMockFill";
+import { extractOntology } from "@/api/ai";
 import type { UseReferencesResult } from "./useReferences";
 
 export type Step1Path = "choice" | "uploading";
@@ -24,9 +24,10 @@ export interface UseExperimentWizardResult {
  * Encapsulates all state and handlers shared by the "new experiment" and
  * "reinitialize experiment" wizard flows.
  *
- * Pages that use this hook only need to supply their own `onFinish` logic
- * (create vs. overwrite) and any page-specific side-effects (e.g. draft name
- * sync for the new-experiment flow).
+ * On analysis completion the hook calls POST /api/ai/extract-ontology with the
+ * text content of any uploaded reference files, then populates the wizard form
+ * with the structured response.  If no files were uploaded or extraction fails,
+ * the form is left empty for the user to fill manually.
  */
 export function useExperimentWizard(): UseExperimentWizardResult {
   const [activeStepId, setActiveStepId] = useState(1);
@@ -36,12 +37,34 @@ export function useExperimentWizard(): UseExperimentWizardResult {
   const form = useWizardForm();
   const hasPopulated = useRef(false);
 
+  // Keep a stable ref to refs.readFilesAsText so the aiAnalysis callback
+  // always sees the current version without being in the dep array.
+  const readFilesAsTextRef = useRef(refs.readFilesAsText);
+  readFilesAsTextRef.current = refs.readFilesAsText;
+
+  const populateFromAIRef = useRef(form.populateFromAI);
+  populateFromAIRef.current = form.populateFromAI;
+
   const aiAnalysis = useAiAnalysis({
     onComplete: () => {
-      if (!hasPopulated.current) {
-        hasPopulated.current = true;
-        form.populateFromAI(AI_MOCK_FILL);
-      }
+      if (hasPopulated.current) return;
+      hasPopulated.current = true;
+
+      // Read uploaded file content, then call the real extraction API.
+      readFilesAsTextRef.current()
+        .then((referenceContent) =>
+          extractOntology({
+            referenceContent: referenceContent.trim() || undefined,
+          }),
+        )
+        .then((data) => {
+          populateFromAIRef.current(data);
+        })
+        .catch((err) => {
+          // Extraction failed (no API key, network error, model error, etc.).
+          // Log the error and leave the form empty — user fills manually.
+          console.warn("[AI] ontology extraction failed; form left empty:", err);
+        });
     },
   });
 
