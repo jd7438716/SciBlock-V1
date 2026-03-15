@@ -1,7 +1,7 @@
 /**
  * 团队成员路由
  *
- * GET    /api/team/members          — 获取所有成员（首次访问自动 seed）
+ * GET    /api/team/members          — 获取所有成员
  * POST   /api/team/members          — 邀请新成员
  * GET    /api/team/members/:id      — 获取成员详情
  * PATCH  /api/team/members/:id      — 更新成员信息
@@ -11,6 +11,8 @@
  *
  * GET    /api/team/members/:id/reports  — 获取周报列表
  * POST   /api/team/members/:id/reports  — 提交周报
+ *
+ * Initial data is populated by bash scripts/seed-dev.sh — not by HTTP routes.
  */
 
 import { Router, type IRouter } from "express";
@@ -22,131 +24,11 @@ import { requireInstructor } from "../middleware/requireAuth";
 const router: IRouter = Router();
 
 // ---------------------------------------------------------------------------
-// Seed data
-// ---------------------------------------------------------------------------
-
-async function seedStudents() {
-  const existing = await db.select().from(studentsTable).limit(1);
-  if (existing.length > 0) return;
-
-  const students = await db.insert(studentsTable).values([
-    {
-      name: "张伟",
-      enrollmentYear: 2022,
-      degree: "phd",
-      researchTopic: "纳米复合材料的电化学性能研究",
-      phone: "13800138001",
-      email: "zhang.wei@lab.edu",
-      status: "active",
-    },
-    {
-      name: "李婷",
-      enrollmentYear: 2023,
-      degree: "master",
-      researchTopic: "二维材料界面调控与器件应用",
-      phone: "13800138002",
-      email: "li.ting@lab.edu",
-      status: "active",
-    },
-    {
-      name: "王磊",
-      enrollmentYear: 2021,
-      degree: "phd",
-      researchTopic: "固态锂电池界面工程",
-      phone: "13800138003",
-      email: "wang.lei@lab.edu",
-      status: "active",
-    },
-    {
-      name: "陈雪",
-      enrollmentYear: 2020,
-      degree: "phd",
-      researchTopic: "光催化产氢材料体系设计",
-      phone: "13800138004",
-      email: "chen.xue@lab.edu",
-      status: "graduated",
-    },
-    {
-      name: "刘浩",
-      enrollmentYear: 2024,
-      degree: "master",
-      researchTopic: "钙钛矿太阳能电池稳定性",
-      phone: null,
-      email: "liu.hao@lab.edu",
-      status: "pending",
-    },
-  ]).returning();
-
-  // Seed some papers for Zhang Wei
-  if (students.length > 0) {
-    const zhangWeiId = students[0].id;
-    const liTingId = students[1].id;
-    const wangLeiId = students[2].id;
-
-    await db.insert(papersTable).values([
-      {
-        studentId: zhangWeiId,
-        title: "Enhanced Electrochemical Performance of Nano-Composite Electrode Materials",
-        journal: "ACS Nano",
-        year: 2024,
-        abstract: "We report a systematic study of nano-composite electrode materials with enhanced electrochemical performance...",
-        doi: "10.1021/acsnano.4c01234",
-        isThesis: false,
-      },
-      {
-        studentId: zhangWeiId,
-        title: "Interfacial Engineering in Composite Materials for Energy Storage",
-        journal: "Advanced Materials",
-        year: 2023,
-        abstract: "A novel approach to interfacial engineering that significantly improves charge transfer kinetics...",
-        doi: "10.1002/adma.202301234",
-        isThesis: false,
-      },
-      {
-        studentId: liTingId,
-        title: "Two-Dimensional Materials: Interface Modulation and Device Applications",
-        journal: "Nature Communications",
-        year: 2024,
-        abstract: "Interface modulation of 2D materials enables high-performance electronic devices...",
-        doi: "10.1038/s41467-024-12345-6",
-        isThesis: false,
-      },
-      {
-        studentId: wangLeiId,
-        title: "Solid-State Lithium Battery Interface Engineering: A Comprehensive Review",
-        journal: "Energy & Environmental Science",
-        year: 2023,
-        abstract: "This review comprehensively covers recent advances in solid-state lithium battery interfaces...",
-        doi: "10.1039/D3EE12345A",
-        isThesis: false,
-      },
-    ]);
-
-    // Seed weekly reports
-    const now = new Date();
-    const reports = [];
-    for (let i = 0; i < 6; i++) {
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - i * 7);
-      const weekStr = weekStart.toISOString().slice(0, 10);
-      reports.push({
-        studentId: zhangWeiId,
-        title: `第 ${6 - i} 周实验进展报告`,
-        content: `本周主要完成了以下工作：\n1. 完成了纳米复合材料的合成与表征\n2. 对样品进行了电化学性能测试\n3. 分析了实验数据并与理论模型进行对比\n\n下周计划：\n1. 优化合成参数\n2. 补充 TEM 表征\n3. 撰写实验报告`,
-        weekStart: weekStr,
-      });
-    }
-    await db.insert(weeklyReportsTable).values(reports);
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Members
 // ---------------------------------------------------------------------------
 
 router.get("/members", async (_req, res) => {
   try {
-    await seedStudents();
     const members = await db.select().from(studentsTable).orderBy(studentsTable.createdAt);
     res.json({ members: members.reverse() });
   } catch (err) {
