@@ -5,6 +5,8 @@ export interface NavItem {
   label: string;
   href: string;
   Icon: LucideIcon;
+  /** When set, only users whose role is in this list will see this item. */
+  roles?: string[];
 }
 
 // An optional inline action button that appears to the right of a group title.
@@ -33,7 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "团队",
     items: [
       { label: "成员管理", href: "/home/members", Icon: Users },
-      { label: "周报管理", href: "/home/reports", Icon: ClipboardList },
+      { label: "周报管理", href: "/home/reports", Icon: ClipboardList, roles: ["instructor"] },
     ],
   },
   {

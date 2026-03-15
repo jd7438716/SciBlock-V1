@@ -7,6 +7,7 @@ import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
 import { useSciNoteActions } from "@/hooks/useSciNoteActions";
 import { useTrash } from "@/contexts/TrashContext";
 import { useMessages } from "@/contexts/MessagesContext";
+import { useCurrentUser } from "@/contexts/UserContext";
 import { NavLink } from "./NavLink";
 import { SciNoteRow } from "./SciNoteRow";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -43,8 +44,10 @@ export function AppSidebar() {
   const { draftName } = useNewExperimentDraft();
   const actions = useSciNoteActions();
   const { trashedRecords } = useTrash();
-
   const { unreadCount } = useMessages();
+  const { currentUser } = useCurrentUser();
+
+  const role = currentUser?.role ?? "";
   const trashCount = trashedRecords.length;
   const trashActive = location === "/personal/trash";
 
@@ -53,9 +56,14 @@ export function AppSidebar() {
       ? { label: draftName.trim() || DRAFT_FALLBACK, href: "/personal/new-experiment", Icon: BookOpen }
       : null;
 
-  const groups: NavGroup[] = NAV_GROUPS.map((g) =>
-    g.title === "个人" ? { ...g, items: draftItem ? [draftItem] : [] } : g,
-  );
+  // Filter nav groups: remove items whose `roles` list doesn't include the current user's role.
+  const groups: NavGroup[] = NAV_GROUPS.map((g) => {
+    const filteredItems = g.items.filter(
+      (item) => !item.roles || item.roles.includes(role),
+    );
+    if (g.title === "个人") return { ...g, items: draftItem ? [draftItem] : [] };
+    return { ...g, items: filteredItems };
+  });
 
   return (
     <aside className="w-52 flex-shrink-0 h-screen bg-white border-r border-gray-100 flex flex-col py-4">
