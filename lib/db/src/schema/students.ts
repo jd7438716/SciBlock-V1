@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 // ---------------------------------------------------------------------------
 // students — 团队成员档案
@@ -22,11 +23,15 @@ export const studentsTable = pgTable("students", {
    * Foreign key into the users table (users.id).
    * Nullable — instructor accounts and unlinked legacy profiles have no user_id.
    * Unique — one user account ↔ at most one student profile.
+   * ON DELETE SET NULL — deleting a user account unlinks the profile without
+   * destroying the academic record.
    *
-   * TRANSITION: populated via seed / admin SQL for now.
-   * Long-term: introduce a proper Drizzle migration file instead of db push.
+   * TRANSITION: column was added via db push in a prior session.
+   * The FK constraint is now properly tracked through Drizzle migration 0001.
    */
-  userId: text("user_id").unique(),
+  userId: text("user_id")
+    .unique()
+    .references(() => usersTable.id, { onDelete: "set null" }),
 });
 
 export type Student = typeof studentsTable.$inferSelect;
@@ -38,7 +43,9 @@ export type InsertStudent = typeof studentsTable.$inferInsert;
 
 export const papersTable = pgTable("papers", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  studentId: text("student_id").notNull(),
+  studentId: text("student_id")
+    .notNull()
+    .references(() => studentsTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   journal: text("journal"),
   year: integer("year"),
@@ -59,7 +66,9 @@ export type InsertPaper = typeof papersTable.$inferInsert;
 
 export const weeklyReportsTable = pgTable("weekly_reports", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  studentId: text("student_id").notNull(),
+  studentId: text("student_id")
+    .notNull()
+    .references(() => studentsTable.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   content: text("content").notNull().default(""),
   /** ISO date YYYY-MM-DD for the start of the week */

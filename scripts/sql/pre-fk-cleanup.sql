@@ -1,0 +1,31 @@
+-- =============================================================================
+-- scripts/sql/pre-fk-cleanup.sql — Pre-migration orphan data cleanup
+-- =============================================================================
+-- Purpose:
+--   Removes dev-era orphan records that would cause FK constraint violations
+--   when Drizzle applies the 0001_fk_constraints.sql migration.
+--
+-- Execution:
+--   Called by scripts/migrate.sh BEFORE Drizzle migrations run.
+--   Never called directly from application code or seed scripts.
+--
+-- Idempotency:
+--   Every DELETE uses a NOT IN / NOT EXISTS guard. After the first run,
+--   each statement matches 0 rows and is a no-op.
+--
+-- Orphans addressed:
+--   weekly_reports.student_id — records referencing non-existent student IDs.
+--   Root cause: early development used hardcoded string values ('test-user')
+--   instead of real UUIDs. These records have no valid parent in the students
+--   table and cannot be preserved.
+--
+-- Out of scope (deferred):
+--   report_comments rows with author_id = 'u1' or 'instructor-1' are NOT
+--   deleted here. The FK report_comments.author_id → users.id is intentionally
+--   deferred to a future migration. Those records are orphaned relative to that
+--   future FK only — they do not block any constraint added in this round.
+--   See lib/db/src/schema/reports.ts for the TRANSITION note.
+-- =============================================================================
+
+DELETE FROM weekly_reports
+WHERE student_id NOT IN (SELECT id FROM students);

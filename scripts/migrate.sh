@@ -60,9 +60,29 @@ fi
 log "DATABASE_URL is set."
 
 # ---------------------------------------------------------------------------
+# Pre-migration data cleanup
+# ---------------------------------------------------------------------------
+# Runs idempotent DELETE statements that remove orphan records from
+# Drizzle-managed tables before FK constraints are applied.
+# The SQL file uses NOT IN guards — it matches 0 rows once the data is clean.
+#
+# This step lives in migrate.sh (not inside Drizzle's migration files) so that
+# Drizzle's journal tracks only schema changes, with no manual journal editing.
+run_cleanup() {
+  local cleanup_sql="${ROOT_DIR}/scripts/sql/pre-fk-cleanup.sql"
+  if [ -f "${cleanup_sql}" ]; then
+    log "Running pre-migration data cleanup..."
+    psql "${DATABASE_URL}" -f "${cleanup_sql}" -q
+    log_ok "Pre-migration data cleanup complete."
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Drizzle migration
 # ---------------------------------------------------------------------------
 run_drizzle() {
+  run_cleanup
+
   log "Running Drizzle migrations (Express tables)..."
 
   # drizzle-kit migrate is non-interactive and idempotent.

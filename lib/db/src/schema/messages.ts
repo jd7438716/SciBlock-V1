@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
 
 /**
  * messages — 用户收件箱
@@ -19,7 +20,9 @@ export const messagesTable = pgTable("messages", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  recipientId: text("recipient_id").notNull(),
+  recipientId: text("recipient_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   senderName: text("sender_name").notNull(),
   type: text("type").notNull(),
   status: text("status").notNull().default("unread"),
