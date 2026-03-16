@@ -1,0 +1,51 @@
+# 构建阶段
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 复制工作区配置文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# 安装所有依赖（包括 workspace）
+RUN pnpm install --frozen-lockfile
+
+# 复制源代码
+COPY artifacts/api-server ./artifacts/api-server
+COPY lib ./lib
+
+# 进入 API 服务器目录构建
+WORKDIR /app/artifacts/api-server
+# 安装该工作区的依赖（包括 devDependencies）
+RUN pnpm install
+RUN pnpm run build
+
+# 运行时阶段
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 安装 pnpm 和 curl（用于健康检查）
+RUN npm install -g pnpm && apk add --no-cache curl
+
+# 复制工作区配置文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# 仅安装生产依赖（包括 workspace）
+RUN pnpm install --prod --frozen-lockfile
+
+# 从构建阶段复制构建产物
+COPY --from=builder /app/artifacts/api-server/dist ./dist
+
+# 确保缺失的依赖已安装（修复 http-proxy-middleware 缺失问题）
+RUN npm install http-proxy-middleware
+RUN npm install jose
+RUN npm install bcryptjs
+
+# 暴露端口
+EXPOSE 8080
+
+# 运行服务
+CMD ["node", "dist/index.cjs"]

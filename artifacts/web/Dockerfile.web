@@ -1,0 +1,47 @@
+# 构建阶段
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 防止 rollup 原生模块错误
+ENV ROLLUP_NATIVE=0
+
+# 复制工作区配置文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# 安装所有依赖（包括 workspace）
+RUN pnpm install --frozen-lockfile
+
+# 复制源代码
+COPY artifacts/web ./artifacts/web
+COPY lib ./lib
+
+# 进入 web 目录构建
+WORKDIR /app/artifacts/web
+# 安装该工作区的依赖（包括 devDependencies）
+RUN pnpm install
+# 禁用 rollup 原生模块（避免 Alpine 兼容性问题）
+ENV ROLLUP_DISABLE_NATIVE=1
+ENV PORT=3000
+RUN echo '{"compilerOptions": {}}' > ../../tsconfig.base.json
+RUN pnpm run build
+
+# 运行时阶段
+FROM node:20-slim
+
+WORKDIR /app
+
+# 安装 serve 用于提供静态文件服务
+RUN npm install -g serve
+
+# 从构建阶段复制构建产物
+COPY --from=builder /app/artifacts/web/dist ./dist
+
+# 暴露端口
+EXPOSE 22333
+
+# 运行 serve 提供静态文件服务
+CMD ["serve", "-s", "dist/public", "-l", "22333"]

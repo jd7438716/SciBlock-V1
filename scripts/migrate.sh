@@ -71,9 +71,13 @@ log "DATABASE_URL is set."
 run_cleanup() {
   local cleanup_sql="${ROOT_DIR}/scripts/sql/pre-fk-cleanup.sql"
   if [ -f "${cleanup_sql}" ]; then
-    log "Running pre-migration data cleanup..."
-    psql "${DATABASE_URL}" -f "${cleanup_sql}" -q
-    log_ok "Pre-migration data cleanup complete."
+    if command -v psql &>/dev/null; then
+      log "Running pre-migration data cleanup..."
+      psql "${DATABASE_URL}" -f "${cleanup_sql}" -q
+      log_ok "Pre-migration data cleanup complete."
+    else
+      log "psql not found, skipping pre-migration data cleanup."
+    fi
   fi
 }
 

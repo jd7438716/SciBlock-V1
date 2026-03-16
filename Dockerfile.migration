@@ -1,0 +1,28 @@
+# 迁移构建器
+FROM node:20-alpine AS base
+
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 安装 Go 和 goose 用于迁移
+RUN apk add --no-cache go git bash postgresql-client
+RUN go install github.com/pressly/goose/v3/cmd/goose@latest
+
+# 复制 package.json 和 pnpm-lock.yaml
+COPY package.json pnpm-lock.yaml* ./
+
+# 安装依赖
+RUN pnpm install --no-frozen-lockfile
+
+# 复制整个项目（包括脚本和库）
+COPY . .
+
+# 设置环境变量（可选）
+ENV DATABASE_URL=""
+ENV JWT_SECRET=""
+ENV ADMIN_SECRET=""
+
+# 运行迁移
+CMD ["sh", "-c", "pnpm migrate"]

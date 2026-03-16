@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sciblock
+      POSTGRES_PASSWORD: sciblock_password
+      POSTGRES_DB: sciblock
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sciblock-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sciblock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - sciblock-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile.migration
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sciblock:sciblock_password@postgres:5432/sciblock
+      JWT_SECRET: ${JWT_SECRET:-change-me-use-openssl-rand-hex-32}
+      ADMIN_SECRET: ${ADMIN_SECRET:-sciblock-admin-dev}
+    command: sh -c "pnpm migrate && bash scripts/seed-dev.sh"
+    networks:
+      - sciblock-network
+    profiles:
+      - migrate
+
+  go-api:
+    build:
+      context: ./artifacts/go-api
+      dockerfile: Dockerfile.go-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 8082
+      ENV: ${ENV:-development}
+      DATABASE_URL: postgresql://sciblock:sciblock_password@postgres:5432/sciblock
+      JWT_SECRET: ${JWT_SECRET:-change-me-use-openssl-rand-hex-32}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-168}
+      BCRYPT_COST: ${BCRYPT_COST:-12}
+      AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80}
+    ports:
+      - "8082:8082"
+    networks:
+      - sciblock-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api-server:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile.api-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      go-api:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://sciblock:sciblock_password@postgres:5432/sciblock
+      ADMIN_SECRET: ${ADMIN_SECRET:-sciblock-admin-dev}
+      JWT_SECRET: ${JWT_SECRET:-change-me-use-openssl-rand-hex-32}
+      AI_PROVIDER: ${AI_PROVIDER:-qianwen}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GO_API_URL: http://go-api:8082
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80}
+    ports:
+      - "8080:8080"
+    networks:
+      - sciblock-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/web/Dockerfile.web
+    restart: unless-stopped
+    depends_on:
+      - api-server
+    environment:
+      PORT: 22333
+      BASE_PATH: ${BASE_PATH:-/}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    ports:
+      - "22333:22333"
+    networks:
+      - sciblock-network
+    # 生产静态文件由 Nginx 提供，因此此服务仅用于开发；生产部署时注释掉
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+      api-server:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.docker.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - sciblock-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  sciblock-network:
+    driver: bridge
