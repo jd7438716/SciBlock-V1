@@ -1,0 +1,1 @@
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sciblock_v1" pnpm --filter @workspace/db run migrate
