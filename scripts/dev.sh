@@ -46,6 +46,35 @@ log_go()     { echo -e "${CYAN}[go-api]${NC}     $*"; }
 log_info()   { echo -e "${YELLOW}[dev]${NC}        $*"; }
 log_error()  { echo -e "${RED}[error]${NC}      $*" >&2; }
 
+require_node_runtime() {
+  if ! command -v node &>/dev/null; then
+    log_error "Node.js not found. Install Node 20.19+ or 22.12+."
+    exit 1
+  fi
+
+  local node_version major minor
+  node_version="$(node -p \"process.versions.node\" 2>/dev/null || true)"
+  if [ -z "${node_version}" ]; then
+    log_error "Unable to determine Node.js version. Install Node 20.19+ or 22.12+."
+    exit 1
+  fi
+
+  IFS='.' read -r major minor _ <<< "${node_version}"
+  if [ -z "${major}" ] || [ -z "${minor}" ]; then
+    log_error "Unrecognized Node.js version: ${node_version}"
+    exit 1
+  fi
+
+  if ! {
+    [ "${major}" -eq 20 ] && [ "${minor}" -ge 19 ];
+  } && ! {
+    [ "${major}" -ge 22 ] && { [ "${major}" -gt 22 ] || [ "${minor}" -ge 12 ]; };
+  }; then
+    log_error "Node.js ${node_version} is too old. Vite 7 and tsx require Node 20.19+ or 22.12+."
+    exit 1
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Cleanup: kill all child processes on exit / Ctrl-C
 # ---------------------------------------------------------------------------
@@ -94,8 +123,10 @@ start_go() {
   fi
 
   log_go "Starting Go API server on :${GO_PORT:-8082}..."
-  PORT="${GO_PORT:-8082}" \
-    go run "${go_dir}/cmd/server/main.go" &
+  (
+    cd "${go_dir}"
+    PORT="${GO_PORT:-8082}" go run ./cmd/server/main.go
+  ) &
   PIDS+=($!)
   log_go "PID $!"
 }
@@ -104,6 +135,8 @@ start_go() {
 # Main
 # ---------------------------------------------------------------------------
 SERVICE="${1:-all}"
+
+require_node_runtime
 
 log_info "SciBlock dev environment"
 log_info "Root: ${ROOT_DIR}"

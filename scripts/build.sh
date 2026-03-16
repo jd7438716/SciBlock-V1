@@ -32,6 +32,35 @@ log()       { echo -e "${YELLOW}[build]${NC} $*"; }
 log_ok()    { echo -e "${GREEN}[build]${NC} $*"; }
 log_error() { echo -e "${RED}[build]${NC} $*" >&2; }
 
+require_node_runtime() {
+  if ! command -v node &>/dev/null; then
+    log_error "Node.js not found. Install Node 20.19+ or 22.12+."
+    exit 1
+  fi
+
+  local node_version major minor
+  node_version="$(node -p \"process.versions.node\" 2>/dev/null || true)"
+  if [ -z "${node_version}" ]; then
+    log_error "Unable to determine Node.js version. Install Node 20.19+ or 22.12+."
+    exit 1
+  fi
+
+  IFS='.' read -r major minor _ <<< "${node_version}"
+  if [ -z "${major}" ] || [ -z "${minor}" ]; then
+    log_error "Unrecognized Node.js version: ${node_version}"
+    exit 1
+  fi
+
+  if ! {
+    [ "${major}" -eq 20 ] && [ "${minor}" -ge 19 ];
+  } && ! {
+    [ "${major}" -ge 22 ] && { [ "${major}" -gt 22 ] || [ "${minor}" -ge 12 ]; };
+  }; then
+    log_error "Node.js ${node_version} is too old. Vite 7 and tsx require Node 20.19+ or 22.12+."
+    exit 1
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Build steps
 # ---------------------------------------------------------------------------
@@ -74,6 +103,8 @@ build_go() {
 # ---------------------------------------------------------------------------
 SERVICE="${1:-all}"
 START_TIME=$(date +%s)
+
+require_node_runtime
 
 log "Starting build (service: ${SERVICE})"
 
