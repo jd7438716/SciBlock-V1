@@ -10,13 +10,18 @@ RUN npm install -g pnpm
 RUN apk add --no-cache go git bash postgresql-client
 RUN go install github.com/pressly/goose/v3/cmd/goose@latest
 
-# 复制 package.json 和 pnpm-lock.yaml
-COPY package.json pnpm-lock.yaml* ./
+# 复制 workspace 配置（必须先复制，pnpm 才能识别 workspace）
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 
-# 安装依赖
+# 复制各 workspace 包的 package.json（用于缓存依赖层）
+COPY lib/db/package.json lib/db/
+COPY lib/db/drizzle.config.ts lib/db/
+COPY scripts/package.json scripts/
+
+# 安装所有依赖（包括 workspace 依赖）
 RUN pnpm install --no-frozen-lockfile
 
-# 复制整个项目（包括脚本和库）
+# 复制整个项目源码（package.json 已复制，所以这里用 .dockerignore 控制）
 COPY . .
 
 # 设置环境变量（可选）

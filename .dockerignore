@@ -1,0 +1,44 @@
+# Dependencies
+node_modules
+*/node_modules
+*/*/node_modules
+
+# Build outputs
+dist
+build
+*.tsbuildinfo
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+logs
+
+# Test files
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+tests/
+coverage/
+
+# Docker files (don't need in image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Documentation (keep for reference, but not required)
+*.md
+!lib/db/migrations/*.sql
+
+# Misc
+.env
+.env.*
+!.env.docker.example

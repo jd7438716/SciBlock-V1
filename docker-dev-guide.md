@@ -143,6 +143,7 @@ ADMIN_SECRET=your-admin-secret-generated-by-openssl-rand-hex-16
 # 环境
 ENV=development
 NODE_ENV=development
+AUTO_MIGRATE=true
 
 # 可选 AI 配置
 AI_PROVIDER=qianwen
@@ -170,6 +171,15 @@ docker-compose run --rm migration
 ```bash
 docker-compose run --rm migration pnpm migrate drizzle
 ```
+
+### 清理旧数据
+若需在迁移前彻底清除数据库中的所有表（例如，解决表冲突或重新初始化），可设置环境变量 `CLEAN_DB=true`：
+
+```bash
+docker-compose run --rm -e CLEAN_DB=true migration
+```
+
+该操作会删除 public schema 中的所有表并重新创建 schema，然后执行完整的迁移和种子数据注入。**注意：此操作会丢失所有现有数据**，请谨慎使用。
 
 ## 前端开发
 
@@ -214,13 +224,17 @@ docker-compose run --rm migration pnpm migrate drizzle
    - **现象**：启动时出现 `Cannot find module 'http-proxy-middleware'` 错误。
    - **解决方案**：已通过修改 `artifacts/api-server/package.json` 显式添加该依赖并重新构建镜像。
 
-3. **Drizzle 迁移因 `users` 表不存在而失败**
-   - **现象**：首次启动时 `migration` 服务失败，因为 Goose 迁移尚未创建 `users` 表。
-   - **解决方案**：手动执行 `scripts/migrate.sh drizzle` 创建 Drizzle 所需表结构，或直接使用已提供的 SQL 文件 `seed_users.sql` 创建表。
+3. **Drizzle 迁移因 `users` 表已存在而失败**
+   - **现象**：运行 `docker-compose run --rm migration` 时出现 `relation "users" already exists` 错误。
+   - **原因**：数据库中存在旧表（可能由之前的 Goose 迁移创建），但 Drizzle 迁移历史表 `drizzle.__drizzle_migrations` 为空，导致 Drizzle 尝试重新创建表。
+   - **解决方案**：
+     1. 运行基线脚本标记现有迁移为已应用：`docker-compose run --rm migration bash -c "bash scripts/db-baseline.sh"`
+     2. 如需彻底清理，可设置环境变量 `CLEAN_DB=true` 运行迁移，该选项会删除 public schema 中的所有表并重新创建：`docker-compose run --rm -e CLEAN_DB=true migration`
+     3. 或者，完全重置数据库：`docker-compose down -v` 后重新运行迁移。
 
-4. **Go API 自动迁移未创建 Drizzle 所需的 `users` 表**
-   - **说明**：Go API 的 Goose 迁移仅创建 Go 所需表，不包括 Express 所需的 `users` 表（Drizzle 管理）。需要单独运行 Drizzle 迁移。
-   - **已解决**：我们已手动执行 Drizzle 迁移 SQL，确保两个 API 均可正常使用用户数据。
+4. **Go API 自动迁移与 Drizzle 迁移的协作**
+   - **说明**：Go API 的 Goose 迁移创建 `scinotes`、`experiment_records` 等表，Drizzle 迁移创建 `users`、`messages`、`students` 等表。两者通过迁移历史表独立管理。
+   - **已解决**：项目已配置 `AUTO_MIGRATE=true`（默认），Go API 启动时会自动运行 Goose 迁移；Drizzle 迁移通过 `migration` 服务执行。首次启动时按顺序运行即可。
 
 5. **前端端口映射冲突**
    - **现象**：`web` 服务使用端口 22333，可能与本地其他服务冲突。

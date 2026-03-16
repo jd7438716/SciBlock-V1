@@ -82,9 +82,27 @@ run_cleanup() {
 }
 
 # ---------------------------------------------------------------------------
+# Database reset (optional)
+# ---------------------------------------------------------------------------
+reset_db() {
+  log "reset_db called, CLEAN_DB=${CLEAN_DB:-false}"
+  if [ "${CLEAN_DB:-false}" = "true" ]; then
+    log "Cleaning database: dropping all tables in public schema..."
+    psql "${DATABASE_URL}" <<EOF
+DROP SCHEMA public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO sciblock;
+EOF
+    log_ok "Database reset complete."
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Drizzle migration
 # ---------------------------------------------------------------------------
 run_drizzle() {
+  log "run_drizzle starting, calling reset_db"
+  reset_db
   run_cleanup
 
   log "Running Drizzle migrations (Express tables)..."
