@@ -5,83 +5,20 @@ import { ReportListPanel } from "./ReportListPanel";
 import { ReportWorkPanel } from "./ReportWorkPanel";
 import { GenerateReportWizard } from "./wizard/GenerateReportWizard";
 import { AiReportDetailPanel } from "./detail/AiReportDetailPanel";
-import { useMyReports, useCurrentStudentProfile, getCurrentWeekDefaults } from "@/hooks/reports/useMyReports";
+import { useMyReports, useCurrentStudentProfile } from "@/hooks/reports/useMyReports";
 import { useCurrentUser } from "@/contexts/UserContext";
 import type { WeeklyReport } from "@/types/weeklyReport";
-import { fmtDate, isAiGenerated } from "@/types/weeklyReport";
-
-// ---------------------------------------------------------------------------
-// New report dialog (inline, manual)
-// ---------------------------------------------------------------------------
-interface NewReportDialogProps {
-  onConfirm: (title: string, weekStart: string, weekEnd: string) => void;
-  onCancel: () => void;
-}
-
-function NewReportForm({ onConfirm, onCancel }: NewReportDialogProps) {
-  const { weekStart, weekEnd } = getCurrentWeekDefaults();
-  const [title, setTitle] = useState(`周报 ${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`);
-  const [ws, setWs] = useState(weekStart);
-  const [we, setWe] = useState(weekEnd);
-
-  return (
-    <div className="flex-1 flex items-center justify-center bg-gray-50">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-96">
-        <h3 className="text-base font-semibold text-gray-800 mb-4">新建周报</h3>
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">标题</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
-              <input
-                type="date"
-                value={ws}
-                onChange={(e) => setWs(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">结束日期</label>
-              <input
-                type="date"
-                value={we}
-                onChange={(e) => setWe(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-1">
-            <button
-              onClick={onCancel}
-              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              取消
-            </button>
-            <button
-              onClick={() => onConfirm(title.trim() || "新周报", ws, we)}
-              className="flex-1 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
-            >
-              创建草稿
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { isAiGenerated } from "@/types/weeklyReport";
 
 // ---------------------------------------------------------------------------
 // Right panel mode
+//
+// "empty"     — no report selected (shows placeholder)
+// "wizard"    — 3-step auto-summary wizard (creates + generates a new report)
+// "work"      — manual/historical report editor / viewer (ReportWorkPanel)
+// "ai-detail" — structured view for an AI-generated report (AiReportDetailPanel)
 // ---------------------------------------------------------------------------
-type RightMode = "empty" | "new-form" | "wizard" | "work" | "ai-detail";
+type RightMode = "empty" | "wizard" | "work" | "ai-detail";
 
 // ---------------------------------------------------------------------------
 // Main page
@@ -90,7 +27,7 @@ type RightMode = "empty" | "new-form" | "wizard" | "work" | "ai-detail";
 export function MyReportsPage() {
   const { currentUser } = useCurrentUser();
   const { profile, loading: profileLoading, error: profileError } = useCurrentStudentProfile();
-  const { reports, loading: reportsLoading, reload, create, save, submit, remove } = useMyReports(
+  const { reports, loading: reportsLoading, reload, save, submit, remove } = useMyReports(
     profile?.id ?? null,
   );
   const search = useSearch();
@@ -109,15 +46,16 @@ export function MyReportsPage() {
     const reportId = params.get("reportId");
     if (reportId) {
       setSelectedId(reportId);
-      setRightMode("work"); // will be overridden to ai-detail if needed (see below)
+      // Mode will be resolved by the effect below once reports are loaded
     }
   }, [search]);
 
-  // Derive right panel mode based on selected report
+  // Derive right panel mode from selected report whenever selection or its
+  // generationStatus changes (e.g. after poll completes or on initial load)
   const selectedReport = reports.find((r) => r.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (rightMode === "wizard" || rightMode === "new-form") return;
+    if (rightMode === "wizard") return; // wizard manages itself
     if (!selectedReport) {
       setRightMode("empty");
     } else if (isAiGenerated(selectedReport)) {
@@ -129,16 +67,7 @@ export function MyReportsPage() {
 
   const handleSelect = (r: WeeklyReport) => {
     setSelectedId(r.id);
-    if (isAiGenerated(r)) {
-      setRightMode("ai-detail");
-    } else {
-      setRightMode("work");
-    }
-  };
-
-  const handleNew = () => {
-    setSelectedId(null);
-    setRightMode("new-form");
+    setRightMode(isAiGenerated(r) ? "ai-detail" : "work");
   };
 
   const handleAiGenerate = () => {
@@ -146,21 +75,18 @@ export function MyReportsPage() {
     setRightMode("wizard");
   };
 
-  const handleNewConfirm = async (title: string, weekStart: string, weekEnd: string) => {
-    const report = await create(title, weekStart, weekEnd);
-    setSelectedId(report.id);
-    setRightMode("work");
-  };
-
   const handleWizardComplete = async (report: WeeklyReport) => {
-    // Reload the full list so the new report appears
     await reload();
     setSelectedId(report.id);
     setRightMode("ai-detail");
   };
 
   const handleWizardCancel = () => {
-    setRightMode(selectedReport ? (isAiGenerated(selectedReport) ? "ai-detail" : "work") : "empty");
+    setRightMode(
+      selectedReport
+        ? isAiGenerated(selectedReport) ? "ai-detail" : "work"
+        : "empty"
+    );
   };
 
   const handleReportUpdated = (updated: WeeklyReport) => {
@@ -213,19 +139,11 @@ export function MyReportsPage() {
           reports={reports}
           selectedId={selectedId}
           onSelect={handleSelect}
-          onNew={handleNew}
           onAiGenerate={handleAiGenerate}
           loading={loading}
         />
 
         {/* Right: mode-based panel */}
-        {rightMode === "new-form" && (
-          <NewReportForm
-            onConfirm={handleNewConfirm}
-            onCancel={() => setRightMode("empty")}
-          />
-        )}
-
         {rightMode === "wizard" && (
           <GenerateReportWizard
             onComplete={handleWizardComplete}
