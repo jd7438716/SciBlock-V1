@@ -6,7 +6,8 @@ import type { RecentExperimentItem } from "@/types/recentExperiment";
 interface Props {
   items: RecentExperimentItem[];
   loading?: boolean;
-  onItemClick: (id: string) => void;
+  error?: Error | null;
+  onItemClick: (item: RecentExperimentItem) => void;
 }
 
 /** Skeleton placeholder card — mirrors NoteCard's dimensions. */
@@ -24,20 +25,27 @@ function SkeletonCard() {
  * RecentNotes — displays the "最近实验" card grid below the AI query box.
  *
  * States:
- *   loading=true        → header + 4 skeleton cards (context still initialising)
+ *   loading=true        → header + 4 skeleton cards
+ *   error               → header + error banner (non-fatal; data may load later)
  *   items.length === 0  → header + empty state message
  *   items.length > 0    → header + 2-column card grid
  *
- * The section header ("最近实验") is always visible so the page layout
- * does not shift on load.
+ * The section header is always visible so the page layout does not shift.
  */
-export function RecentNotes({ items, loading = false, onItemClick }: Props) {
+export function RecentNotes({ items, loading = false, error = null, onItemClick }: Props) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
         <RotateCcw size={15} className="text-gray-400" />
-        <h2 className="text-sm font-medium text-gray-700">最近项目</h2>
+        <h2 className="text-sm font-medium text-gray-700">最近实验</h2>
       </div>
+
+      {/* Error banner — shown even if items are stale / empty */}
+      {error && (
+        <div className="mb-3 rounded-lg bg-red-50 border border-red-100 px-3 py-2 text-xs text-red-600">
+          加载失败：{error.message}
+        </div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-2 gap-3 max-w-2xl">
@@ -56,7 +64,7 @@ export function RecentNotes({ items, loading = false, onItemClick }: Props) {
       ) : (
         <div className="grid grid-cols-2 gap-3 max-w-2xl">
           {items.map((item) => (
-            <NoteCard key={item.id} item={item} onClick={onItemClick} />
+            <NoteCard key={item.experimentId} item={item} onClick={onItemClick} />
           ))}
         </div>
       )}

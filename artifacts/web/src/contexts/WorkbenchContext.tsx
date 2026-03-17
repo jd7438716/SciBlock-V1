@@ -163,6 +163,13 @@ interface Props {
   initialModules?: OntologyModule[];
   /** Extra records to seed (e.g. ones previously restored from trash). */
   extraRecords?: ExperimentRecord[];
+  /**
+   * If provided, the workbench opens directly on this experiment record
+   * instead of defaulting to the first record. Used when navigating from the
+   * home page "最近实验" feed via ?experimentId= query param.
+   * The value is consumed once at mount; it does not track URL changes.
+   */
+  initialRecordId?: string;
   children: React.ReactNode;
 }
 
@@ -173,6 +180,7 @@ export function WorkbenchProvider({
   objective,
   initialModules,
   extraRecords = [],
+  initialRecordId,
   children,
 }: Props) {
   const trash = useTrash();
@@ -226,9 +234,13 @@ export function WorkbenchProvider({
     saveWorkbenchRecords(sciNoteId, records);
   }, [sciNoteId, records]);
 
-  const [currentRecordId, setCurrentRecordId] = useState<string>(
-    () => records[0]?.id ?? "",
-  );
+  const [currentRecordId, setCurrentRecordId] = useState<string>(() => {
+    if (initialRecordId) {
+      const exists = records.some((r) => r.id === initialRecordId);
+      if (exists) return initialRecordId;
+    }
+    return records[0]?.id ?? "";
+  });
 
   const currentRecord = records.find((r) => r.id === currentRecordId) ?? records[0] ?? EMPTY_RECORD;
 

@@ -75,6 +75,9 @@ func New(
                         r.Get("/scinotes/{id}/experiments", experimentH.ListBySciNote)
                         r.Post("/scinotes/{id}/experiments", experimentH.Create)
 
+                        // Experiments — cross-SciNote feed (must be registered before /{id} routes)
+                        r.Get("/experiments/recent", experimentH.ListRecent)
+
                         // Experiments — standalone operations (by experiment ID)
                         r.Get("/experiments/{id}", experimentH.Get)
                         r.Patch("/experiments/{id}", experimentH.Update)

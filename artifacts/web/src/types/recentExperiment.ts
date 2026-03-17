@@ -1,27 +1,21 @@
 /**
- * RecentExperimentItem — the minimal shape used by the home page's
- * "recent experiments" card list.
+ * RecentExperimentItem — the view-model type for the home page "最近实验" feed.
  *
- * Derived from ApiSciNote / SciNote by useRecentExperiments.
- * Components that render these cards should import from here, not from
- * the raw API types, to keep the boundary explicit.
+ * This is the ONLY type that feed hooks, cards, and the RecentNotes section
+ * should consume. Raw API shapes stay inside api/recentExperiments.ts.
+ *
+ * Field contract:
+ *   - experimentId / sciNoteId  used for navigation
+ *   - experimentTitle           primary card heading
+ *   - sciNoteTitle              secondary line (parent project name)
+ *   - effectiveTime             ISO timestamp for <time dateTime> attribute
+ *   - ago                       pre-formatted relative label ("3 天前")
  */
 export interface RecentExperimentItem {
-  /** SciNote UUID — used as the navigate target: /personal/experiment/:id */
-  id: string;
-  /** Display title; falls back to "未命名实验" if blank */
-  title: string;
-  /** Optional subtitle shown below the title (experimentType) */
-  subtitle: string | null;
-  /**
-   * The best available timestamp for this record:
-   *   updatedAt ?? createdAt ?? null
-   *
-   * Named "effectiveTime" rather than "updatedAt" because the source may
-   * be createdAt when updatedAt is absent. Consumers must not assume this
-   * is strictly the last-modified time.
-   */
-  effectiveTime: string | null;
-  /** Pre-formatted relative time label, e.g. "3 天前". "—" when no time available. */
-  ago: string;
+  experimentId:    string;
+  experimentTitle: string;
+  sciNoteId:       string;
+  sciNoteTitle:    string;
+  effectiveTime:   string | null;
+  ago:             string;
 }

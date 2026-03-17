@@ -52,3 +52,21 @@ type ListExperimentsResponse struct {
         Items []ExperimentResponse `json:"items"`
         Total int                  `json:"total"`
 }
+
+// RecentExperimentItem is the JSON shape for a single entry in the recent-experiments feed.
+// It is a JOIN result across experiment_records and sci_notes — never a full ExperimentRecord.
+type RecentExperimentItem struct {
+        ExperimentID     string    `json:"experimentId"`
+        ExperimentTitle  string    `json:"experimentTitle"`
+        SciNoteID        string    `json:"sciNoteId"`
+        SciNoteTitle     string    `json:"sciNoteTitle"`
+        ExperimentStatus string    `json:"experimentStatus"`
+        CreatedAt        time.Time `json:"createdAt"`
+        UpdatedAt        time.Time `json:"updatedAt"`
+}
+
+// ListRecentExperimentsResponse is returned by GET /api/experiments/recent.
+type ListRecentExperimentsResponse struct {
+        Items []RecentExperimentItem `json:"items"`
+}
+

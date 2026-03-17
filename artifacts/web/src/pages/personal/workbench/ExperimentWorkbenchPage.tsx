@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useSearch } from "wouter";
 import { FlaskConical, Plus } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useSciNoteStore } from "@/contexts/SciNoteStoreContext";
@@ -72,6 +72,8 @@ function WorkbenchAppLayout() {
  */
 export function ExperimentWorkbenchPage() {
   const { id } = useParams<{ id: string }>();
+  const search = useSearch();
+  const initialRecordId = new URLSearchParams(search).get("experimentId") ?? undefined;
   const { notes } = useSciNoteStore();
   const { getRestoredForSciNote, clearRestoredForSciNote } = useTrash();
 
@@ -123,6 +125,7 @@ export function ExperimentWorkbenchPage() {
       objective={note.objective}
       initialModules={initialModules}
       extraRecords={extraRecordsRef.current}
+      initialRecordId={initialRecordId}
     >
       <WorkbenchAppLayout />
     </WorkbenchProvider>
