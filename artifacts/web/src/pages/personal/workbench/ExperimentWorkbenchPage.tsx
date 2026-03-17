@@ -40,15 +40,15 @@ function NoExperimentsState() {
 // ---------------------------------------------------------------------------
 
 /**
- * WorkbenchAppLayout — renders AppLayout with no TopBar title (the record
- * title is already shown inside the editor; the project context is in
- * ExperimentInfoBar).  Shows an empty state when no experiments exist yet.
+ * WorkbenchAppLayout — renders AppLayout with the SciNote title in the TopBar.
+ * The record title is shown in the editor; tab switching is in RecordSwitcher.
+ * Shows an empty state when no experiments exist yet.
  */
 function WorkbenchAppLayout() {
-  const { records } = useWorkbench();
+  const { sciNoteTitle, records } = useWorkbench();
 
   return (
-    <AppLayout title="" noPadding>
+    <AppLayout title={sciNoteTitle} noPadding>
       {records.length === 0 ? <NoExperimentsState /> : <WorkbenchLayout />}
     </AppLayout>
   );

@@ -1,5 +1,5 @@
 import React from "react";
-import { ChevronLeft, ChevronRight, FlaskConical } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
 import { RecordSwitcher } from "./RecordSwitcher";
 import { OntologyPanel } from "./OntologyPanel";
@@ -54,72 +54,9 @@ function FocusDivider() {
 }
 
 /**
- * ExperimentInfoBar — slim context strip shown between RecordSwitcher and the
- * three-panel area.  Always rendered inside the workbench.
- *
- * Layout:
- *   项目 <sciNoteTitle>  [·  🔬 experimentType]  [·  目标: objective]
- *
- * The project label is always visible so users know which SciNote they are in.
- * experimentType and objective appear only when set.
- */
-function ExperimentInfoBar() {
-  const { sciNoteTitle, experimentType, objective } = useWorkbench();
-
-  return (
-    <div className="flex items-center gap-3 px-4 py-1.5 bg-gray-50 border-b border-gray-100 min-h-0 flex-shrink-0">
-      {/* Project label — always visible */}
-      <span className="flex items-center gap-1.5 flex-shrink-0 min-w-0 max-w-[180px]">
-        <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide flex-shrink-0">
-          项目
-        </span>
-        <span
-          className="text-xs font-medium text-gray-700 truncate"
-          title={sciNoteTitle}
-        >
-          {sciNoteTitle || "—"}
-        </span>
-      </span>
-
-      {/* Divider — only when more metadata follows */}
-      {(experimentType || objective) && (
-        <span className="text-gray-200 text-xs flex-shrink-0">·</span>
-      )}
-
-      {/* Experiment type badge */}
-      {experimentType && (
-        <span className="flex items-center gap-1.5 flex-shrink-0">
-          <FlaskConical size={11} className="text-violet-400" />
-          <span className="text-xs font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-2 py-0.5 leading-none">
-            {experimentType}
-          </span>
-        </span>
-      )}
-
-      {/* Divider — only when objective follows type */}
-      {experimentType && objective && (
-        <span className="text-gray-200 text-xs flex-shrink-0">·</span>
-      )}
-
-      {/* Objective (truncated, native tooltip for full text) */}
-      {objective && (
-        <span
-          title={objective}
-          className="flex-1 min-w-0 text-xs text-gray-500 truncate"
-        >
-          <span className="text-gray-400 mr-1">目标：</span>
-          {objective}
-        </span>
-      )}
-    </div>
-  );
-}
-
-/**
  * WorkbenchLayout — full page layout inside WorkbenchProvider.
  *
  *   [RecordSwitcher — full width tab bar]
- *   [ExperimentInfoBar — slim metadata strip, only when data exists]
  *   [OntologyPanel | FocusDivider | EditorPanel | UtilityRail]
  *
  * OntologyPanel width is controlled by focusMode.
@@ -130,11 +67,8 @@ export function WorkbenchLayout() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* Record switcher spans the full width above the info bar and panels */}
+      {/* Record switcher spans the full width above the three-panel area */}
       <RecordSwitcher />
-
-      {/* Context bar — always visible: project name + optional experiment metadata */}
-      <ExperimentInfoBar />
 
       {/* Three-panel area */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
