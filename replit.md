@@ -104,6 +104,24 @@ Both tools target the same PostgreSQL database. All goose migrations use `IF NOT
 | `pnpm build` | Production build of all services |
 | `pnpm migrate` | Run Drizzle push + goose up |
 
+## Dev Seed Data
+
+The development database contains a small set of hand-seeded records used to verify UI features that require non-trivial data.
+
+| Record | Detail |
+|--------|--------|
+| **Attachment display sample** | `experiment_records` id `ae26fecc-cb80-48de-beea-2bfe1ce33e3a`, title `exp01`, owner `demo@sciblock.com` (李婷). The `measurement` module's items `meas-2` (SEM 表面形貌) and `meas-3` (四探针法电阻测量) carry 3 attachment metadata entries (`att-seed-01`, `att-seed-02`, `att-seed-03`). Used to verify the `AttachmentViewStrip` read-only display on the instructor member-experiment detail page. **Recommended to keep** — it is the only experiment in the dev DB that exercises the attachment UI path. |
+
+To remove the attachment sample if no longer needed:
+```sql
+UPDATE experiment_records
+SET current_modules = jsonb_set(
+  jsonb_set(current_modules,
+    '{3,structuredData,measurementItems,1,attachments}', 'null'::jsonb),
+  '{3,structuredData,measurementItems,2,attachments}', 'null'::jsonb)
+WHERE id = 'ae26fecc-cb80-48de-beea-2bfe1ce33e3a';
+```
+
 ## Replit Workflows
 
 | Workflow | Command | Port |
