@@ -35,6 +35,7 @@ import {
 } from "@/data/workbenchStorage";
 import { useTrash } from "@/contexts/TrashContext";
 import { useToast } from "@/hooks/use-toast";
+import { useExperimentReport } from "@/hooks/useExperimentReport";
 import {
   listExperiments,
   createExperiment,
@@ -654,61 +655,30 @@ export function WorkbenchProvider({
   }
 
   // ---------------------------------------------------------------------------
-  // Report actions
+  // Report actions — delegated to useExperimentReport hook.
+  //
+  // isGeneratingReport / reportError state ownership stays here so that
+  // setModuleStatus()'s auto-trigger path (Phase 2 work) can continue to
+  // call setIsGeneratingReport / setReportError directly without change.
   // ---------------------------------------------------------------------------
 
-  /**
-   * Compute reportStatus from transient flags + persisted record.
-   * Kept as a plain function (not useMemo) so the value is always fresh
-   * when consumed by the context value object below.
-   */
-  function computeReportStatus(
-    rec: ExperimentRecord,
-    generating: boolean,
-    errored: boolean,
-  ): ReportStatus {
-    if (generating)    return "generating";
-    if (errored)       return "error";
-    if (rec.reportHtml) return "ready";
-    return "idle";
-  }
-
-  function triggerReportGeneration() {
-    if (isGeneratingReport) return;
-    setIsGeneratingReport(true);
-    setReportError(false);
-
-    // Capture the modules at trigger time — async callback must not
-    // close over stale state, so we read from the functional updater.
-    const rec = records.find((r) => r.id === currentRecordId) ?? records[0];
-    generateExperimentReport({
-      title: rec.title,
-      experimentType,
-      objective,
-      modules: rec.currentModules,
-    })
-      .then((html) => {
-        setRecords((prev) =>
-          prev.map((r) =>
-            r.id === currentRecordId ? { ...r, reportHtml: html } : r,
-          ),
-        );
-        setIsGeneratingReport(false);
-      })
-      .catch(() => {
-        setIsGeneratingReport(false);
-        setReportError(true);
-      });
-  }
-
-  function updateReport(html: string) {
-    patchCurrentRecord({ reportHtml: html });
-  }
-
-  function clearReport() {
-    patchCurrentRecord({ reportHtml: undefined });
-    setReportError(false);
-  }
+  const {
+    reportStatus,
+    triggerReportGeneration,
+    updateReport,
+    clearReport,
+  } = useExperimentReport({
+    experimentType,
+    objective,
+    currentRecord,
+    currentRecordId,
+    isGenerating:       isGeneratingReport,
+    hasError:           reportError,
+    setIsGenerating:    setIsGeneratingReport,
+    setHasError:        setReportError,
+    setRecords,
+    patchCurrentRecord,
+  });
 
   // ---------------------------------------------------------------------------
   // AI title assist
@@ -770,7 +740,7 @@ export function WorkbenchProvider({
     flowDraftInserted,
     registerEditorInsert,
     unregisterEditorInsert,
-    reportStatus: computeReportStatus(currentRecord, isGeneratingReport, reportError),
+    reportStatus,
     triggerReportGeneration,
     updateReport,
     clearReport,
