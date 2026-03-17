@@ -9,6 +9,7 @@ export interface SciNote {
    */
   kind: "placeholder" | "wizard";
   createdAt?: string;
+  updatedAt?: string;
   /** Populated only for wizard-created notes */
   formData?: WizardFormData;
 

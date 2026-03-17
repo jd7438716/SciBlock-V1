@@ -36,6 +36,7 @@ function apiSciNoteToLocal(n: ApiSciNote): SciNote {
     title: n.title,
     kind: n.kind === "wizard" ? "wizard" : "placeholder",
     createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
     experimentType: n.experimentType ?? undefined,
     objective: n.objective ?? undefined,
     formData: n.formData ?? undefined,

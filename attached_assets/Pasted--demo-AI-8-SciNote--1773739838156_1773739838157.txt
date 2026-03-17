@@ -1,0 +1,116 @@
+现在开始实现这个功能，但要严格按可维护结构来做，不要写成页面内堆逻辑的 demo。
+
+目标
+主页 AI 对话框下面，默认显示最近 8 个实验卡片。
+点击任意卡片，直接跳转到对应的 SciNote 实验记录界面：
+/personal/experiment/:id
+
+已知前提
+- 首页页面：artifacts/web/src/pages/HomePage.tsx
+- 最近卡片区域组件：RecentNotes
+- 单卡组件：NoteCard
+- SciNote 数据已存在于 SciNoteStoreContext
+- 目标详情页已经存在并可根据 SciNote id 正常加载：
+  /personal/experiment/:id
+- 当前首页 still 使用 PLACEHOLDER_NOTES，需要替换成真实数据
+- 当前 handleNoteClick 只是 stub，需要接入真实导航
+
+实现要求
+请严格拆成“数据选择逻辑 / 展示组件 / 页面接入”三层，不要把排序、截取、时间格式化全部塞进 HomePage.tsx。
+
+一、数据层改造
+请新增一个首页专用 hook，例如：
+
+artifacts/web/src/hooks/useRecentExperiments.ts
+
+职责只做这几件事：
+1. 从 SciNoteStoreContext 读取 scinotes 数据
+2. 过滤掉不该出现在首页最近实验里的无效项（如果当前没有无效项规则，就先不过滤）
+3. 按 updatedAt 倒序排序，最新的在前
+4. 取前 8 条
+5. 返回首页卡片真正需要的最小字段
+
+建议返回结构明确一点，例如：
+{
+  id: string;
+  title: string;
+  subtitle?: string;      // 可先用 experimentType 或 kind
+  updatedAt: string;
+  ago: string;            // 格式化后的相对时间
+}
+
+要求：
+- 相对时间格式化逻辑也放在 hook 内部或独立 util，不要写在 HomePage
+- 不要修改 SciNoteStoreContext 的职责
+- 不要在 HomePage 里直接排序/切片/拼装字段
+
+如果你觉得更合理，也可以把时间格式化抽到：
+artifacts/web/src/utils/formatRelativeTime.ts
+
+二、类型层改造
+当前 types/note.ts 太窄，请处理干净，但不要为了兼容旧占位类型继续将就。
+
+做法二选一，优先更干净的方案：
+方案 A：
+- 新增首页专用类型，比如 HomeRecentExperimentCard / RecentExperimentItem
+- RecentNotes 和 NoteCard 改用这个更准确的类型
+
+方案 B：
+- 扩展 Note 类型，但前提是命名仍然合理，不会污染其他场景
+
+我的偏好：
+优先方案 A，不要让“Note”这个过于模糊的类型继续承担首页实验卡片的数据语义。
+
+三、页面接入
+在 HomePage.tsx 中：
+1. 移除 PLACEHOLDER_NOTES 的实际使用
+2. 接入 useRecentExperiments(8)
+3. 使用 wouter 的导航能力（useLocation 或项目内一致写法）
+4. 点击卡片时执行：
+   navigate(`/personal/experiment/${id}`)
+
+要求：
+- HomePage 只负责组装页面，不负责数据加工
+- handleNoteClick 可以保留，但只做调用 navigate，不做别的逻辑
+
+四、展示层要求
+RecentNotes / NoteCard 组件做以下调整：
+1. 支持展示真实数据
+2. 保持当前 UI 风格尽量不大改
+3. 每张卡片至少展示：
+   - title
+   - ago
+4. 如果 subtitle 合适且界面不拥挤，可显示 experimentType 或 kind
+5. 增加空态：
+   - 当最近实验为 0 条时，显示明确空态提示
+   - 文案不要写“暂无笔记”，而是贴近产品语义，比如“还没有实验记录”
+6. 保证整个卡片可点击，而不是只有局部可点击
+
+五、边界处理
+请一起处理以下情况：
+1. title 为空时给默认文案，例如“未命名实验”
+2. updatedAt 缺失时，回退到 createdAt
+3. 两者都没有时，ago 显示合理兜底，不要报错
+4. 首页数据加载过程中，如果 context 有 loading 状态，请接入；如果没有，就不要额外发请求
+
+六、代码结构要求
+必须遵守：
+- 页面层、hook 层、展示组件层分开
+- 不要把首页专用逻辑塞进 SciNoteStoreContext
+- 不要为了这次功能改动 ExperimentDetailPage
+- 不要新增无必要的全局状态
+- 不要把“最近 8 条”的规则硬编码在多个文件里，尽量只在一个地方定义
+
+七、完成后请按下面格式回复
+1. 新增了哪些文件
+2. 修改了哪些文件
+3. 数据流现在是怎样的（从 SciNoteStoreContext 到首页卡片）
+4. 点击卡片后的跳转链路是什么
+5. 空态、兜底、排序规则分别是什么
+6. 给我列出你最终使用的数据类型定义
+7. 说明你有没有改动任何现有页面的非必要逻辑
+
+注意
+- 这次先不要扩展首页卡片的复杂内容，不要自由加状态徽章、项目标签、操作菜单
+- 先只打通“展示最近 8 条 + 点击进入实验记录”这条最小闭环
+- 代码风格保持长期可维护，不要 demo 化
