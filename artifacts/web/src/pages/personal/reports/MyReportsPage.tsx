@@ -1,14 +1,17 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ReportListPanel } from "./ReportListPanel";
 import { ReportWorkPanel } from "./ReportWorkPanel";
+import { GenerateReportWizard } from "./wizard/GenerateReportWizard";
+import { AiReportDetailPanel } from "./detail/AiReportDetailPanel";
 import { useMyReports, useCurrentStudentProfile, getCurrentWeekDefaults } from "@/hooks/reports/useMyReports";
 import { useCurrentUser } from "@/contexts/UserContext";
 import type { WeeklyReport } from "@/types/weeklyReport";
-import { fmtDate } from "@/types/weeklyReport";
+import { fmtDate, isAiGenerated } from "@/types/weeklyReport";
 
 // ---------------------------------------------------------------------------
-// New report dialog (inline)
+// New report dialog (inline, manual)
 // ---------------------------------------------------------------------------
 interface NewReportDialogProps {
   onConfirm: (title: string, weekStart: string, weekEnd: string) => void;
@@ -76,37 +79,98 @@ function NewReportForm({ onConfirm, onCancel }: NewReportDialogProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Right panel mode
+// ---------------------------------------------------------------------------
+type RightMode = "empty" | "new-form" | "wizard" | "work" | "ai-detail";
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
 export function MyReportsPage() {
   const { currentUser } = useCurrentUser();
   const { profile, loading: profileLoading, error: profileError } = useCurrentStudentProfile();
-  const { reports, loading: reportsLoading, create, save, submit, remove } = useMyReports(
+  const { reports, loading: reportsLoading, reload, create, save, submit, remove } = useMyReports(
     profile?.id ?? null,
   );
+  const search = useSearch();
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showNewForm, setShowNewForm] = useState(false);
+  const [rightMode, setRightMode] = useState<RightMode>("empty");
 
   const userId = currentUser?.id ?? "";
   const studentId = profile?.id ?? "";
   const studentName = profile?.name ?? "我";
   const loading = profileLoading || reportsLoading;
 
+  // Auto-select when ?reportId=xxx is in URL (e.g. from message notification)
+  useEffect(() => {
+    const params = new URLSearchParams(search ?? "");
+    const reportId = params.get("reportId");
+    if (reportId) {
+      setSelectedId(reportId);
+      setRightMode("work"); // will be overridden to ai-detail if needed (see below)
+    }
+  }, [search]);
+
+  // Derive right panel mode based on selected report
   const selectedReport = reports.find((r) => r.id === selectedId) ?? null;
 
+  useEffect(() => {
+    if (rightMode === "wizard" || rightMode === "new-form") return;
+    if (!selectedReport) {
+      setRightMode("empty");
+    } else if (isAiGenerated(selectedReport)) {
+      setRightMode("ai-detail");
+    } else {
+      setRightMode("work");
+    }
+  }, [selectedReport?.id, selectedReport?.generationStatus]);
+
+  const handleSelect = (r: WeeklyReport) => {
+    setSelectedId(r.id);
+    if (isAiGenerated(r)) {
+      setRightMode("ai-detail");
+    } else {
+      setRightMode("work");
+    }
+  };
+
   const handleNew = () => {
-    setShowNewForm(true);
+    setSelectedId(null);
+    setRightMode("new-form");
+  };
+
+  const handleAiGenerate = () => {
+    setSelectedId(null);
+    setRightMode("wizard");
   };
 
   const handleNewConfirm = async (title: string, weekStart: string, weekEnd: string) => {
     const report = await create(title, weekStart, weekEnd);
     setSelectedId(report.id);
-    setShowNewForm(false);
+    setRightMode("work");
+  };
+
+  const handleWizardComplete = async (report: WeeklyReport) => {
+    // Reload the full list so the new report appears
+    await reload();
+    setSelectedId(report.id);
+    setRightMode("ai-detail");
+  };
+
+  const handleWizardCancel = () => {
+    setRightMode(selectedReport ? (isAiGenerated(selectedReport) ? "ai-detail" : "work") : "empty");
   };
 
   const handleReportUpdated = (updated: WeeklyReport) => {
     setSelectedId(updated.id);
+  };
+
+  const handleDelete = async (id: string) => {
+    await remove(id);
+    setSelectedId(null);
+    setRightMode("empty");
   };
 
   // Profile loading state
@@ -144,34 +208,51 @@ export function MyReportsPage() {
   return (
     <AppLayout title="我的周报">
       <div className="flex h-full -mx-8 -my-8">
-        {showNewForm ? (
+        {/* Left: report list */}
+        <ReportListPanel
+          reports={reports}
+          selectedId={selectedId}
+          onSelect={handleSelect}
+          onNew={handleNew}
+          onAiGenerate={handleAiGenerate}
+          loading={loading}
+        />
+
+        {/* Right: mode-based panel */}
+        {rightMode === "new-form" && (
           <NewReportForm
             onConfirm={handleNewConfirm}
-            onCancel={() => setShowNewForm(false)}
+            onCancel={() => setRightMode("empty")}
           />
-        ) : (
-          <>
-            {/* Left: list */}
-            <ReportListPanel
-              reports={reports}
-              selectedId={selectedId}
-              onSelect={(r) => { setSelectedId(r.id); setShowNewForm(false); }}
-              onNew={handleNew}
-              loading={loading}
-            />
+        )}
 
-            {/* Right: work area */}
-            <ReportWorkPanel
-              report={selectedReport}
-              studentId={studentId}
-              studentName={studentName}
-              userId={userId}
-              onSave={save}
-              onSubmit={submit}
-              onDelete={async (id) => { await remove(id); setSelectedId(null); }}
-              onReportUpdated={handleReportUpdated}
-            />
-          </>
+        {rightMode === "wizard" && (
+          <GenerateReportWizard
+            onComplete={handleWizardComplete}
+            onCancel={handleWizardCancel}
+          />
+        )}
+
+        {(rightMode === "work" || rightMode === "empty") && (
+          <ReportWorkPanel
+            report={rightMode === "work" ? selectedReport : null}
+            studentId={studentId}
+            studentName={studentName}
+            userId={userId}
+            onSave={save}
+            onSubmit={submit}
+            onDelete={handleDelete}
+            onReportUpdated={handleReportUpdated}
+          />
+        )}
+
+        {rightMode === "ai-detail" && selectedReport && (
+          <AiReportDetailPanel
+            report={selectedReport}
+            userId={userId}
+            studentName={studentName}
+            onDelete={handleDelete}
+          />
         )}
       </div>
     </AppLayout>

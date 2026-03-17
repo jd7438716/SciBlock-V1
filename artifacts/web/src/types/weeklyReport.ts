@@ -9,6 +9,13 @@ export type WeeklyReportStatus =
   | "needs_revision"
   | "reviewed";
 
+/** AI generation lifecycle state (stored in DB column generation_status) */
+export type GenerationStatus = "idle" | "generating" | "generated" | "failed";
+
+// ---------------------------------------------------------------------------
+// Manual report content (structured JSON stored in contentJson column)
+// ---------------------------------------------------------------------------
+
 export interface WeeklyReportContent {
   completed: string;    // 本周完成内容
   progress: string;     // 当前实验进展
@@ -25,19 +32,109 @@ export const EMPTY_REPORT_CONTENT: WeeklyReportContent = {
   helpNeeded: "",
 };
 
+// ---------------------------------------------------------------------------
+// AI auto-summary content (stored in ai_content_json column)
+//
+// Produced by the backend rule-based generator from experiment_records.
+// Never call this "AI写作" or "大模型" in UI — use "自动汇总".
+// ---------------------------------------------------------------------------
+
+export interface AiProjectSummaryItem {
+  sciNoteId: string;
+  sciNoteTitle: string;
+  experimentCount: number;
+}
+
+export interface AiStatusDistribution {
+  exploring: number;    // 探索中
+  reproducible: number; // 可复现
+  verified: number;     // 已验证
+  failed: number;       // 失败
+  total: number;
+  conclusion: string;   // 一句话结论
+}
+
+export interface AiParameterChange {
+  paramName: string;
+  changeDescription: string;
+  relatedExperiments: string[];
+  impact: string;
+}
+
+export interface AiOperationStep {
+  step: string;
+  note?: string;
+}
+
+export interface AiResultTrend {
+  direction: string;
+  finding: string;
+  hasClearTrend: boolean;
+  relatedExperiments: string[];
+}
+
+export interface AiProvenanceExperiment {
+  id: string;
+  title: string;
+  sciNoteId: string;
+  sciNoteTitle: string;
+  date: string;    // YYYY-MM-DD
+  status: string;  // Chinese status string
+}
+
+export interface AiReportContent {
+  summary: string;
+  theme: string;
+  projectSummary: AiProjectSummaryItem[];
+  statusDistribution: AiStatusDistribution;
+  parameterChanges: AiParameterChange[];
+  operationSummary: AiOperationStep[];
+  resultsTrends: AiResultTrend[];
+  provenanceExperiments: AiProvenanceExperiment[];
+}
+
+// ---------------------------------------------------------------------------
+// Preview response (GET /reports/preview)
+// ---------------------------------------------------------------------------
+
+export interface ReportPreviewExperiment {
+  id: string;
+  title: string;
+  sciNoteId: string;
+  sciNoteTitle: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface ReportPreviewResponse {
+  experimentCount: number;
+  sciNoteCount: number;
+  experiments: ReportPreviewExperiment[];
+}
+
+// ---------------------------------------------------------------------------
+// WeeklyReport entity (as returned by the API)
+// ---------------------------------------------------------------------------
+
 export interface WeeklyReport {
   id: string;
   studentId: string;
   title: string;
-  weekStart: string;      // YYYY-MM-DD (Monday)
-  weekEnd: string | null; // YYYY-MM-DD (Sunday)
+  weekStart: string;           // YYYY-MM-DD (Monday)
+  weekEnd: string | null;      // YYYY-MM-DD (Sunday)
   status: WeeklyReportStatus;
-  content: string;         // backward-compat plain text
-  contentJson: string | null; // JSON-stringified WeeklyReportContent
+  content: string;             // backward-compat plain text
+  contentJson: string | null;  // JSON-stringified WeeklyReportContent
   submittedAt: string | null;
   reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // AI generation fields
+  generationStatus: GenerationStatus;
+  aiContentJson: string | null;
+  dateRangeStart: string | null;
+  dateRangeEnd: string | null;
+  experimentCount: number;
 }
 
 export interface WeeklyReportComment {
@@ -50,13 +147,19 @@ export interface WeeklyReportComment {
   createdAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// API payloads
+// ---------------------------------------------------------------------------
+
 export interface CreateWeeklyReportPayload {
-  studentId: string;
+  studentId?: string;
   title: string;
   weekStart: string;
   weekEnd?: string;
   contentJson?: string;
   status?: WeeklyReportStatus;
+  dateRangeStart?: string;
+  dateRangeEnd?: string;
 }
 
 export interface UpdateWeeklyReportPayload {
@@ -65,6 +168,8 @@ export interface UpdateWeeklyReportPayload {
   weekEnd?: string;
   contentJson?: string;
   status?: WeeklyReportStatus;
+  dateRangeStart?: string;
+  dateRangeEnd?: string;
 }
 
 export interface AddWeeklyReportCommentPayload {
@@ -87,6 +192,19 @@ export function parseReportContent(report: WeeklyReport): WeeklyReportContent {
     }
   }
   return { ...EMPTY_REPORT_CONTENT, completed: report.content };
+}
+
+export function parseAiContent(report: WeeklyReport): AiReportContent | null {
+  if (!report.aiContentJson) return null;
+  try {
+    return JSON.parse(report.aiContentJson) as AiReportContent;
+  } catch {
+    return null;
+  }
+}
+
+export function isAiGenerated(report: WeeklyReport): boolean {
+  return report.generationStatus === "generated" && Boolean(report.aiContentJson);
 }
 
 /** Returns the Monday (ISO) of the week containing `date`. */
@@ -127,3 +245,11 @@ export function fmtWeekLabel(weekStart: string): string {
   );
   return `${year}年 第${weekNum}周`;
 }
+
+/** Chinese label for experiment status */
+export const EXP_STATUS_COLORS: Record<string, string> = {
+  "探索中": "bg-blue-50 text-blue-700",
+  "可复现": "bg-purple-50 text-purple-700",
+  "已验证": "bg-green-50 text-green-700",
+  "失败":   "bg-red-50 text-red-700",
+};

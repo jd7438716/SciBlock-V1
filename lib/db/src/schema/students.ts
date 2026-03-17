@@ -83,6 +83,16 @@ export const weeklyReportsTable = pgTable("weekly_reports", {
   reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // AI 汇总生成相关字段
+  /** 生成状态: idle | generating | generated | failed */
+  generationStatus: text("generation_status").notNull().default("idle"),
+  /** JSON-stringified AiReportContent (structured generation output) */
+  aiContentJson: text("ai_content_json"),
+  /** 生成时选择的任意起止日期 (YYYY-MM-DD)，与 weekStart/weekEnd 独立 */
+  dateRangeStart: text("date_range_start"),
+  dateRangeEnd: text("date_range_end"),
+  /** 本次汇总纳入的实验记录数量 */
+  experimentCount: integer("experiment_count").notNull().default(0),
 });
 
 export type WeeklyReport = typeof weeklyReportsTable.$inferSelect;

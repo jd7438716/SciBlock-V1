@@ -5,7 +5,7 @@
  */
 
 import React from "react";
-import { UserRound, MessageSquare, Share2, Trash2 } from "lucide-react";
+import { UserRound, MessageSquare, Share2, Trash2, BookOpen } from "lucide-react";
 import type { Message, MessageType } from "../../types/messages";
 import { MESSAGE_TYPE_LABELS, MESSAGE_TYPE_COLORS } from "../../types/messages";
 
@@ -14,9 +14,10 @@ import { MESSAGE_TYPE_LABELS, MESSAGE_TYPE_COLORS } from "../../types/messages";
 // ---------------------------------------------------------------------------
 
 const TYPE_ICONS: Record<MessageType, React.ElementType> = {
-  invitation:    UserRound,
-  comment:       MessageSquare,
-  share_request: Share2,
+  invitation:     UserRound,
+  comment:        MessageSquare,
+  share_request:  Share2,
+  report_comment: BookOpen,
 };
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import type {
   CreateWeeklyReportPayload,
   UpdateWeeklyReportPayload,
   AddWeeklyReportCommentPayload,
+  ReportPreviewResponse,
 } from "@/types/weeklyReport";
 
 // ---------------------------------------------------------------------------
@@ -18,6 +19,55 @@ import type {
  */
 export function fetchMyReports(): Promise<WeeklyReport[]> {
   return apiFetch<WeeklyReport[]>("/reports");
+}
+
+// ---------------------------------------------------------------------------
+// Preview — GET /reports/preview?dateStart=...&dateEnd=...
+//
+// Returns experiments that fall in the given date range for the current user.
+// Used in Step 2 of the Generate Report wizard to show what will be included.
+// ---------------------------------------------------------------------------
+
+export function fetchReportPreview(dateStart: string, dateEnd: string): Promise<ReportPreviewResponse> {
+  const qs = `?dateStart=${encodeURIComponent(dateStart)}&dateEnd=${encodeURIComponent(dateEnd)}`;
+  return apiFetch<ReportPreviewResponse>(`/reports/preview${qs}`);
+}
+
+// ---------------------------------------------------------------------------
+// Generate — POST /reports/:id/generate
+//
+// Triggers async rule-based content generation. Returns 202 immediately.
+// Poll GET /reports/:id until generationStatus is "generated" or "failed".
+// ---------------------------------------------------------------------------
+
+export interface TriggerGenerateResponse {
+  reportId: string;
+  generationStatus: "generating";
+}
+
+export function triggerGenerate(reportId: string): Promise<TriggerGenerateResponse> {
+  return apiFetch<TriggerGenerateResponse>(`/reports/${reportId}/generate`, { method: "POST" });
+}
+
+/**
+ * Polls a single report until generationStatus !== "generating", or until
+ * maxAttempts is reached (throws on timeout).
+ *
+ * @param reportId   Report ID to poll
+ * @param intervalMs Polling interval in ms (default 1500)
+ * @param maxAttempts Maximum polls before throwing (default 20, ~30 s)
+ */
+export async function pollUntilGenerated(
+  reportId: string,
+  intervalMs = 1500,
+  maxAttempts = 20,
+): Promise<WeeklyReport> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const report = await apiFetch<WeeklyReport>(`/reports/${reportId}`);
+    if (report.generationStatus !== "generating") return report;
+    await new Promise((res) => setTimeout(res, intervalMs));
+  }
+  throw new Error("生成超时，请稍后刷新页面查看结果。");
 }
 
 // ---------------------------------------------------------------------------

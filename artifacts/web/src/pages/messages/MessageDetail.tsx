@@ -15,6 +15,7 @@ import { useMessages } from "../../contexts/MessagesContext";
 import { InvitationDetail } from "./detail/InvitationDetail";
 import { CommentDetail } from "./detail/CommentDetail";
 import { ShareRequestDetail } from "./detail/ShareRequestDetail";
+import { ReportCommentDetail } from "./detail/ReportCommentDetail";
 
 // ---------------------------------------------------------------------------
 // Empty state
@@ -92,6 +93,9 @@ export function MessageDetail() {
             onAccept={handleAccept}
             onReject={handleReject}
           />
+        )}
+        {message.type === "report_comment" && (
+          <ReportCommentDetail message={message} />
         )}
       </div>
     </div>
