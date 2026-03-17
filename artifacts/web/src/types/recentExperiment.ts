@@ -11,10 +11,17 @@ export interface RecentExperimentItem {
   id: string;
   /** Display title; falls back to "未命名实验" if blank */
   title: string;
-  /** Optional subtitle shown below the title (experimentType or kind) */
+  /** Optional subtitle shown below the title (experimentType) */
   subtitle: string | null;
-  /** ISO timestamp of the most recent update */
-  updatedAt: string;
-  /** Pre-formatted relative time label, e.g. "3 天前" */
+  /**
+   * The best available timestamp for this record:
+   *   updatedAt ?? createdAt ?? null
+   *
+   * Named "effectiveTime" rather than "updatedAt" because the source may
+   * be createdAt when updatedAt is absent. Consumers must not assume this
+   * is strictly the last-modified time.
+   */
+  effectiveTime: string | null;
+  /** Pre-formatted relative time label, e.g. "3 天前". "—" when no time available. */
   ago: string;
 }

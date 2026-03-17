@@ -9,17 +9,29 @@ interface Props {
   onItemClick: (id: string) => void;
 }
 
+/** Skeleton placeholder card — mirrors NoteCard's dimensions. */
+function SkeletonCard() {
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-4 animate-pulse">
+      <div className="h-3.5 bg-gray-100 rounded w-3/4 mb-2" />
+      <div className="h-3 bg-gray-100 rounded w-1/2 mb-4" />
+      <div className="h-3 bg-gray-100 rounded w-1/4" />
+    </div>
+  );
+}
+
 /**
  * RecentNotes — displays the "最近实验" card grid below the AI query box.
  *
  * States:
- *   loading=true        → section is suppressed (context still initialising)
- *   items.length === 0  → empty state with a clear message
- *   items.length > 0    → 2-column card grid
+ *   loading=true        → header + 4 skeleton cards (context still initialising)
+ *   items.length === 0  → header + empty state message
+ *   items.length > 0    → header + 2-column card grid
+ *
+ * The section header ("最近实验") is always visible so the page layout
+ * does not shift on load.
  */
 export function RecentNotes({ items, loading = false, onItemClick }: Props) {
-  if (loading) return null;
-
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
@@ -27,7 +39,13 @@ export function RecentNotes({ items, loading = false, onItemClick }: Props) {
         <h2 className="text-sm font-medium text-gray-700">最近实验</h2>
       </div>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 max-w-2xl">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-10 text-center max-w-2xl">
           <FlaskConical size={28} className="text-gray-200" />
           <p className="text-sm text-gray-400 font-medium">还没有实验记录</p>

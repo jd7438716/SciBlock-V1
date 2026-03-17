@@ -39,10 +39,15 @@ export function NoteCard({ item, onClick }: Props) {
       {item.subtitle && (
         <p className="text-xs text-gray-400 mb-2 truncate">{item.subtitle}</p>
       )}
-      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
-        <Clock size={11} />
-        <span>{item.ago}</span>
-      </div>
+      {item.effectiveTime && (
+        <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
+          <Clock size={11} />
+          <span>{item.ago}</span>
+        </div>
+      )}
+      {!item.effectiveTime && (
+        <div className="mt-2 text-xs text-gray-300">{item.ago}</div>
+      )}
     </div>
   );
 }
