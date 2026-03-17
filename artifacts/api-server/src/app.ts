@@ -23,6 +23,9 @@ const GO_API_PREFIXES = [
   "/api/auth/logout",
   "/api/scinotes",
   "/api/experiments",
+  // Instructor-only read endpoints (member SciNotes + experiments).
+  // Must be listed BEFORE Express handles /api/team/members routes.
+  "/api/instructor",
 ];
 
 const goProxy = createProxyMiddleware<Request, Response>({

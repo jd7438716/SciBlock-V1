@@ -43,6 +43,11 @@ export const STATUS_COLORS: Record<StudentStatus, { bg: string; text: string; ri
 
 export interface Student {
   id: string;
+  /** Auth user ID (users.id / scinotes.user_id).
+   *  Null when the student has been added but has not accepted their invite yet
+   *  (no user account exists).  Use this — NOT `id` — when calling Go API
+   *  instructor endpoints that query scinotes / experiment_records. */
+  userId: string | null;
   name: string;
   avatar: string | null;
   enrollmentYear: number;

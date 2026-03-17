@@ -4,20 +4,16 @@
  * Layer: component (pure UI — no context, no routing logic beyond navigation).
  *
  * 使用场景：成员详情页双栏模式的右侧面板。
- * 用户点击某个 SciNote（项目）后，此面板出现在详情页右侧，
- * 展示该项目下的全部实验记录，不离开成员详情页上下文。
+ * 展示被查看成员在某项目下的真实实验记录（instructor-only 数据链路）。
  *
- * ⚠️  数据边界（已知限制）：
- *   useSciNoteExperiments 调用 GET /api/scinotes/:id/experiments，
- *   该接口以登录用户的 JWT 做所有者校验。即：右侧面板展示的是
- *   "当前登录用户在该 SciNote 下的实验记录"，而不是被查看成员的实验记录。
- *   补充真正的跨用户能力需要后端新增 instructor 级别的专用接口。
+ * 数据来源：useMemberSciNoteExperiments(memberUserId, sciNote.id)
+ *   → GET /api/instructor/members/:userId/scinotes/:sciNoteId/experiments
+ *   → 被查看成员自己的实验记录，不是登录用户的数据。
  */
 
-import React from "react";
 import { useLocation } from "wouter";
 import { X, FlaskConical } from "lucide-react";
-import { useSciNoteExperiments } from "@/hooks/team/useSciNoteExperiments";
+import { useMemberSciNoteExperiments } from "@/hooks/team/useMemberSciNoteExperiments";
 import { STATUS_DOT_CLASS, STATUS_TEXT_CLASS } from "@/types/calendarPanel";
 import type { SciNote } from "@/types/scinote";
 import type { ExperimentRecord, ExperimentStatus } from "@/types/workbench";
@@ -85,13 +81,17 @@ function ExperimentRow({ record, onClick }: ExperimentRowProps) {
 // ---------------------------------------------------------------------------
 
 interface Props {
-  sciNote: SciNote;
-  onClose: () => void;
+  sciNote:      SciNote;
+  memberUserId: string | null;
+  onClose:      () => void;
 }
 
-export function MemberSciNoteExperimentsPanel({ sciNote, onClose }: Props) {
+export function MemberSciNoteExperimentsPanel({ sciNote, memberUserId, onClose }: Props) {
   const [, navigate] = useLocation();
-  const { experiments, loading, error } = useSciNoteExperiments(sciNote.id);
+  const { experiments, loading, error } = useMemberSciNoteExperiments(
+    memberUserId,
+    sciNote.id,
+  );
 
   const sorted = [...experiments].sort(
     (a, b) =>

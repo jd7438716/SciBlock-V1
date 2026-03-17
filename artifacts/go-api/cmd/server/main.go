@@ -9,8 +9,8 @@
 //
 // Migration policy:
 //
-//	AUTO_MIGRATE=true  → run goose on every startup (dev convenience)
-//	AUTO_MIGRATE=false → skip; run explicitly with `make migrate` or scripts/migrate.sh goose
+//      AUTO_MIGRATE=true  → run goose on every startup (dev convenience)
+//      AUTO_MIGRATE=false → skip; run explicitly with `make migrate` or scripts/migrate.sh goose
 package main
 
 import (
@@ -84,6 +84,7 @@ func main() {
         authH := handler.NewAuthHandler(authSvc)
         sciNoteH := handler.NewSciNoteHandler(sciNoteSvc)
         experimentH := handler.NewExperimentHandler(experimentSvc)
+        instructorH := handler.NewInstructorHandler(sciNoteSvc, experimentSvc)
 
         // -------------------------------------------------------------------------
         // HTTP server with graceful shutdown
@@ -91,7 +92,7 @@ func main() {
         addr := fmt.Sprintf(":%s", cfg.Port)
         srv := &http.Server{
                 Addr:         addr,
-                Handler:      router.New(cfg.JWTSecret, cfg.CORSOrigins, authH, sciNoteH, experimentH),
+                Handler:      router.New(cfg.JWTSecret, cfg.CORSOrigins, authH, sciNoteH, experimentH, instructorH),
                 ReadTimeout:  15 * time.Second,
                 WriteTimeout: 30 * time.Second,
                 IdleTimeout:  60 * time.Second,

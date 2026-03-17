@@ -1,19 +1,17 @@
 /**
  * ExperimentRecordsCard — SciNote（项目）列表入口组件。
  *
- * Layer: component
+ * Layer: component (presentational — no data fetching).
  *
- * 职责：展示当前 SciNote 列表，点击某个项目名触发 onSelectSciNote 回调，
+ * 职责：展示成员的 SciNote 列表，点击某个项目名触发 onSelectSciNote 回调，
  * 由父组件（MemberDetailPage）决定如何响应（展开右侧面板）。
  * 本组件不负责导航，不知道面板的存在。
  *
- * ⚠️  数据边界（已知限制）：
- *   notes 来自 useSciNoteStore()，即当前登录用户的 SciNotes，
- *   不是被查看成员的 SciNotes。补充真正的跨用户数据能力需要后端专用接口。
+ * 数据由父组件通过 props 传入，数据来源是 useMemberSciNotes(student.userId)，
+ * 即被查看成员自己的 SciNotes（不再使用登录用户的 SciNoteStore）。
  */
 
 import { useState } from "react";
-import { useSciNoteStore } from "../../../contexts/SciNoteStoreContext";
 import type { SciNote } from "../../../types/scinote";
 
 const INITIAL_LIMIT = 5;
@@ -125,18 +123,40 @@ function RecordRow({ note, isSelected, onClick }: RecordRowProps) {
 // ---------------------------------------------------------------------------
 
 interface ExperimentRecordsCardProps {
-  /** Called when the user clicks a project row. Pass null to deselect. */
+  /** All SciNotes belonging to the viewed member (from useMemberSciNotes). */
+  notes:   SciNote[];
+  loading: boolean;
+  error:   string | null;
+  /** Called when the user clicks a project row. Clicking the same row again
+   *  deselects it (handled by the parent). */
   onSelectSciNote:   (note: SciNote) => void;
   /** The currently selected SciNote ID; used for visual highlight. */
   selectedSciNoteId: string | null;
 }
 
 export default function ExperimentRecordsCard({
+  notes,
+  loading,
+  error,
   onSelectSciNote,
   selectedSciNoteId,
 }: ExperimentRecordsCardProps) {
-  const { notes } = useSciNoteStore();
   const [showAll, setShowAll] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6 gap-2">
+        <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-500 rounded-full animate-spin" />
+        <span className="text-xs text-gray-400">加载中…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <p className="text-xs text-red-400 py-4 text-center">{error}</p>
+    );
+  }
 
   const sorted = [...notes].sort(
     (a, b) =>
@@ -147,7 +167,7 @@ export default function ExperimentRecordsCard({
   if (sorted.length === 0) {
     return (
       <div className="text-center py-6 border border-dashed border-gray-200 rounded-lg">
-        <p className="text-xs text-gray-400">暂无实验记录</p>
+        <p className="text-xs text-gray-400">该成员暂无实验记录</p>
       </div>
     );
   }

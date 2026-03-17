@@ -28,6 +28,7 @@ func New(
         authH *handler.AuthHandler,
         sciNoteH *handler.SciNoteHandler,
         experimentH *handler.ExperimentHandler,
+        instructorH *handler.InstructorHandler,
 ) http.Handler {
         r := chi.NewRouter()
 
@@ -83,6 +84,17 @@ func New(
                         r.Patch("/experiments/{id}", experimentH.Update)
                         r.Delete("/experiments/{id}", experimentH.SoftDelete)
                         r.Patch("/experiments/{id}/restore", experimentH.Restore)
+                })
+
+                // Instructor-only — read access to any student's data.
+                // :userId is the auth user ID (users.id / scinotes.user_id),
+                // NOT the student profile ID (students.id).
+                r.Group(func(r chi.Router) {
+                        r.Use(mw.RequireAuth(jwtSecret))
+                        r.Use(mw.RequireInstructor)
+
+                        r.Get("/instructor/members/{userId}/scinotes", instructorH.ListMemberSciNotes)
+                        r.Get("/instructor/members/{userId}/scinotes/{sciNoteId}/experiments", instructorH.ListMemberExperiments)
                 })
         })
 

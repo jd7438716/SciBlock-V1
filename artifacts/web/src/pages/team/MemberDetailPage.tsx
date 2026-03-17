@@ -4,20 +4,25 @@
  * Layout（两种模式）：
  *
  *   单栏模式（默认，未选中项目时）:
- *     粘性面包屑
+ *     面包屑
  *     单列内容区（max-w-2xl，居中滚动）
  *
  *   双栏模式（选中某个 SciNote 项目后）：
  *     面包屑（全宽）
- *     ┌────────────────────┬─────────────────┐
- *     │ 左栏：成员详情内容  │ 右栏：项目实验  │
- *     │ （独立滚动）        │ 记录面板        │
- *     │                    │ （独立滚动）     │
- *     └────────────────────┴─────────────────┘
+ *     ┌──────────────────────┬──────────────────┐
+ *     │ 左栏：成员详情内容    │ 右栏：项目实验   │
+ *     │ （独立滚动）          │ 记录面板         │
+ *     │                      │ （独立滚动）      │
+ *     └──────────────────────┴──────────────────┘
+ *
+ * 数据语义：
+ *   - useMemberSciNotes(student.userId) — 被查看成员自己的 SciNotes
+ *   - useMemberSciNoteExperiments — 被查看成员在某项目下的实验记录
+ *   - 以上两个 hook 均调用 Go API 的 instructor-only 端点
+ *   - student.userId（auth user ID）用于 Go API 查询；
+ *     student.id（profile ID）用于 Express team API 查询
  *
  * Layer: page
- * Deps: useStudentDetail (hook), ProfileCard, SectionHeading, 4 × Card,
- *       MemberSciNoteExperimentsPanel
  */
 
 import { useState } from "react";
@@ -26,29 +31,34 @@ import {
   BookOpen, FileText, FlaskConical, ScrollText,
   GraduationCap, ChevronLeft,
 } from "lucide-react";
-import { useStudentDetail }             from "../../hooks/team/useStudentDetail";
-import { useSciNoteStore }              from "../../contexts/SciNoteStoreContext";
-import { ProfileCard }                  from "./detail/ProfileCard";
-import { SectionHeading }               from "../../components/team/SectionHeading";
-import BasicInfoCard                    from "./detail/BasicInfoCard";
-import PapersCard                       from "./detail/PapersCard";
-import ExperimentRecordsCard            from "./detail/ExperimentRecordsCard";
-import WeeklyReportsCard                from "./detail/WeeklyReportsCard";
+import { useStudentDetail }              from "../../hooks/team/useStudentDetail";
+import { useMemberSciNotes }             from "../../hooks/team/useMemberSciNotes";
+import { ProfileCard }                   from "./detail/ProfileCard";
+import { SectionHeading }                from "../../components/team/SectionHeading";
+import BasicInfoCard                     from "./detail/BasicInfoCard";
+import PapersCard                        from "./detail/PapersCard";
+import ExperimentRecordsCard             from "./detail/ExperimentRecordsCard";
+import WeeklyReportsCard                 from "./detail/WeeklyReportsCard";
 import { MemberSciNoteExperimentsPanel } from "./detail/MemberSciNoteExperimentsPanel";
-import type { SciNote }                 from "../../types/scinote";
+import type { SciNote }                  from "../../types/scinote";
 
 export default function MemberDetailPage() {
   const { id }       = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const { notes }    = useSciNoteStore();
 
   const { student, loading, error, setStudent } = useStudentDetail(id ?? "");
+
+  // Member's own SciNotes — correct data semantics.
+  // student.userId is the auth user ID that matches scinotes.user_id in Go API.
+  // Null-safe: useMemberSciNotes skips the fetch when userId is null/empty.
+  const memberUserId = student?.userId ?? null;
+  const { notes, loading: notesLoading, error: notesError } = useMemberSciNotes(memberUserId);
 
   const [paperCount,      setPaperCount]      = useState(0);
   const [reportCount,     setReportCount]      = useState(0);
   const [selectedSciNote, setSelectedSciNote] = useState<SciNote | null>(null);
 
-  // ── Toggle: clicking the same project deselects it ─────────────────────
+  // Toggle: clicking the same project deselects it
   function handleSelectSciNote(note: SciNote) {
     setSelectedSciNote((prev) => (prev?.id === note.id ? null : note));
   }
@@ -82,7 +92,7 @@ export default function MemberDetailPage() {
 
   const isDrilling = !!selectedSciNote;
 
-  // ── Detail content (shared between single and dual column) ─────────────
+  // ── Detail content (shared between single/dual column) ─────────────────
   const detailContent = (
     <div
       className={[
@@ -111,6 +121,9 @@ export default function MemberDetailPage() {
       <section>
         <SectionHeading icon={<FlaskConical size={12} />} title="实验记录" count={notes.length} />
         <ExperimentRecordsCard
+          notes={notes}
+          loading={notesLoading}
+          error={notesError}
           onSelectSciNote={handleSelectSciNote}
           selectedSciNoteId={selectedSciNote?.id ?? null}
         />
@@ -127,7 +140,7 @@ export default function MemberDetailPage() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/70">
 
-      {/* ── 面包屑栏（flex-shrink-0，始终固定在顶部）────────── */}
+      {/* ── 面包屑栏 ───────────────────────────────────────── */}
       <div className="flex-shrink-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100 py-2.5">
         <div className="max-w-2xl mx-auto px-6">
           <button
@@ -142,7 +155,7 @@ export default function MemberDetailPage() {
         </div>
       </div>
 
-      {/* ── 内容区 ─────────────────────────────────────────────────────── */}
+      {/* ── 内容区 ─────────────────────────────────────────── */}
       {!isDrilling ? (
 
         // 单栏模式：整体可滚动
@@ -160,10 +173,11 @@ export default function MemberDetailPage() {
             {detailContent}
           </div>
 
-          {/* 右栏：实验记录面板（独立滚动，固定宽度） */}
+          {/* 右栏：实验记录面板（固定宽度，独立滚动） */}
           <div className="w-[400px] flex-shrink-0 flex flex-col overflow-hidden bg-white">
             <MemberSciNoteExperimentsPanel
               sciNote={selectedSciNote}
+              memberUserId={memberUserId}
               onClose={() => setSelectedSciNote(null)}
             />
           </div>

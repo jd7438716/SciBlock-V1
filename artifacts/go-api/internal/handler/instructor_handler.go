@@ -1,0 +1,75 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"sciblock/go-api/internal/dto"
+	"sciblock/go-api/internal/service"
+)
+
+// InstructorHandler handles read-only, instructor-scoped data access.
+//
+// These endpoints allow an instructor to read any student's SciNotes and
+// experiment records.  Role enforcement is applied at the router level via
+// middleware.RequireInstructor — individual methods do NOT re-check the role.
+//
+// URL convention: /api/instructor/members/:userId/...
+// The :userId path parameter is the auth user ID (users.id / scinotes.user_id),
+// NOT the student profile ID (students.id).  The frontend must supply
+// student.userId, not student.id.
+type InstructorHandler struct {
+	sciNotes    *service.SciNoteService
+	experiments *service.ExperimentService
+}
+
+// NewInstructorHandler creates an InstructorHandler.
+func NewInstructorHandler(
+	sciNotes *service.SciNoteService,
+	experiments *service.ExperimentService,
+) *InstructorHandler {
+	return &InstructorHandler{sciNotes: sciNotes, experiments: experiments}
+}
+
+// ListMemberSciNotes handles GET /api/instructor/members/:userId/scinotes
+//
+// Returns all non-deleted SciNotes owned by the target user.
+// Reuses SciNoteService.List — passing targetUserID in place of callerUserID
+// is safe here because the instructor middleware already verified authority.
+func (h *InstructorHandler) ListMemberSciNotes(w http.ResponseWriter, r *http.Request) {
+	targetUserID := chi.URLParam(r, "userId")
+
+	notes, err := h.sciNotes.List(r.Context(), targetUserID)
+	if err != nil {
+		mapServiceError(w, err)
+		return
+	}
+
+	items := make([]dto.SciNoteResponse, len(notes))
+	for i := range notes {
+		items[i] = dto.SciNoteResponseFromDomain(&notes[i])
+	}
+	writeJSON(w, http.StatusOK, dto.ListSciNotesResponse{Items: items, Total: len(items)})
+}
+
+// ListMemberExperiments handles GET /api/instructor/members/:userId/scinotes/:sciNoteId/experiments
+//
+// Returns all non-deleted experiment records for a SciNote owned by the target user.
+// Reuses ExperimentService.List — passing targetUserID verifies SciNote ownership
+// (note.UserID == targetUserID) before returning records.
+func (h *InstructorHandler) ListMemberExperiments(w http.ResponseWriter, r *http.Request) {
+	targetUserID := chi.URLParam(r, "userId")
+	sciNoteID    := chi.URLParam(r, "sciNoteId")
+
+	records, err := h.experiments.List(r.Context(), sciNoteID, targetUserID, false)
+	if err != nil {
+		mapServiceError(w, err)
+		return
+	}
+
+	items := make([]dto.ExperimentResponse, len(records))
+	for i := range records {
+		items[i] = dto.ExperimentResponseFromDomain(&records[i])
+	}
+	writeJSON(w, http.StatusOK, dto.ListExperimentsResponse{Items: items, Total: len(items)})
+}
