@@ -36,7 +36,7 @@ export function RecentNotes({ items, loading = false, onItemClick }: Props) {
     <section>
       <div className="flex items-center gap-2 mb-4">
         <RotateCcw size={15} className="text-gray-400" />
-        <h2 className="text-sm font-medium text-gray-700">最近实验</h2>
+        <h2 className="text-sm font-medium text-gray-700">最近项目</h2>
       </div>
 
       {loading ? (
