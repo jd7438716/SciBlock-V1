@@ -7,7 +7,7 @@ import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
 import { useSciNoteActions } from "@/hooks/useSciNoteActions";
 import { useTrash } from "@/contexts/TrashContext";
 import { useMessages } from "@/contexts/MessagesContext";
-import { useCurrentUser } from "@/contexts/UserContext";
+import { useGlobalPermissions, useHasPermission } from "@/lib/permissions";
 import { NavLink } from "./NavLink";
 import { SciNoteRow } from "./SciNoteRow";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -45,9 +45,7 @@ export function AppSidebar() {
   const actions = useSciNoteActions();
   const { trashedRecords } = useTrash();
   const { unreadCount } = useMessages();
-  const { currentUser } = useCurrentUser();
-
-  const role = currentUser?.role ?? "";
+  const { canSeeTeamReportsNav } = useGlobalPermissions();
   const trashCount = trashedRecords.length;
   const trashActive = location === "/personal/trash";
 
@@ -56,11 +54,25 @@ export function AppSidebar() {
       ? { label: draftName.trim() || DRAFT_FALLBACK, href: "/personal/new-experiment", Icon: BookOpen }
       : null;
 
-  // Filter nav groups: remove items whose `roles` list doesn't include the current user's role.
+  // Filter nav groups based on permissions
   const groups: NavGroup[] = NAV_GROUPS.map((g) => {
-    const filteredItems = g.items.filter(
-      (item) => !item.roles || item.roles.includes(role),
-    );
+    const filteredItems = g.items.filter((item) => {
+      // 优先使用新的 permission 字段
+      if (item.permission) {
+        // 对于团队周报导航，使用全局权限
+        if (item.permission.resource === 'nav.team_reports') {
+          return canSeeTeamReportsNav;
+        }
+        // 其他导航项可以在这里扩展
+        return true;
+      }
+      // 兼容旧的 roles 字段
+      if (item.roles) {
+        return false; // 有过滤 roles 的项暂时隐藏（需要配合权限系统）
+      }
+      // 默认显示
+      return true;
+    });
     if (g.title === "个人") return { ...g, items: draftItem ? [draftItem] : [] };
     return { ...g, items: filteredItems };
   });

@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useCurrentUser } from "@/contexts/UserContext";
+import { useGlobalPermissions } from "@/lib/permissions";
 import type { Student, StudentStatus } from "../../types/team";
 import { STATUS_LABELS } from "../../types/team";
 import { fetchMembers } from "../../api/team";
@@ -23,15 +23,14 @@ const STATUS_FILTERS: { value: StudentStatus | "all"; label: string }[] = [
 
 export default function MembersPage() {
   const [, navigate]    = useLocation();
-  const { currentUser } = useCurrentUser();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [filter, setFilter] = useState<StudentStatus | "all">("all");
 
-  // 只有导师可以看到邀请按钮
-  const canInvite = currentUser?.role === "instructor";
+  // 使用权限系统判断是否可以邀请成员
+  const { canInviteMember } = useGlobalPermissions();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,7 +77,7 @@ export default function MembersPage() {
               共 {students.length} 位成员 · {counts.active ?? 0} 位在读
             </p>
           </div>
-          {canInvite && (
+          {canInviteMember && (
             <button
               onClick={() => setShowInvite(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-black text-white text-sm font-medium rounded-xl hover:bg-gray-800 transition-colors"
@@ -131,7 +130,7 @@ export default function MembersPage() {
             <p className="text-sm font-medium text-gray-500">
               {filter === "all" ? "暂无团队成员" : `暂无${STATUS_LABELS[filter as StudentStatus]}成员`}
             </p>
-            {filter === "all" && canInvite && (
+            {filter === "all" && canInviteMember && (
               <button
                 onClick={() => setShowInvite(true)}
                 className="mt-4 text-sm text-black underline"

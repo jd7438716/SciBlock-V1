@@ -15,6 +15,7 @@ export interface FieldPillProps {
   value:       string;
   inputWidth?: string;
   multiline?:  boolean;
+  readOnly?:   boolean;
   onSave:      (v: string) => Promise<void>;
 }
 
@@ -23,6 +24,7 @@ export function FieldPill({
   value,
   inputWidth = "w-28",
   multiline  = false,
+  readOnly   = false,
   onSave,
 }: FieldPillProps) {
   const [editing, setEditing] = useState(false);
@@ -86,6 +88,18 @@ export function FieldPill({
         >
           <X size={10} />
         </button>
+      </span>
+    );
+  }
+
+  if (readOnly) {
+    return (
+      <span className="inline-flex items-center gap-1.5 bg-slate-100 border border-transparent rounded-full px-3 py-1 transition-all">
+        <span className="text-[11px] font-medium text-slate-500">{label}</span>
+        <span className="w-px h-2.5 bg-slate-300" />
+        <span className="text-[11px] text-slate-700">
+          {value || <span className="text-slate-300 italic">未填写</span>}
+        </span>
       </span>
     );
   }

@@ -22,6 +22,8 @@ export interface StudentStatusTagProps {
   stopPropagation?: boolean;
   /** 紧凑模式：不显示下箭头 */
   compact?: boolean;
+  /** 只读模式：禁止编辑 */
+  readOnly?: boolean;
 }
 
 export function StudentStatusTag({
@@ -29,6 +31,7 @@ export function StudentStatusTag({
   onSave,
   stopPropagation = true,
   compact         = false,
+  readOnly        = false,
 }: StudentStatusTagProps) {
   const [open,   setOpen]   = useState(false);
   const [saving, setSaving] = useState(false);
@@ -58,6 +61,7 @@ export function StudentStatusTag({
   }
 
   function toggle(e: React.MouseEvent) {
+    if (readOnly) return;
     if (stopPropagation) e.stopPropagation();
     if (!saving) setOpen(o => !o);
   }
@@ -70,17 +74,17 @@ export function StudentStatusTag({
       <button
         type="button"
         onClick={toggle}
-        disabled={saving}
+        disabled={saving || readOnly}
         className={`
           inline-flex items-center gap-1 px-2.5 py-1 rounded-full
           text-xs font-medium select-none transition-all
           ${sc.bg} ${sc.text}
           ring-1 ${sc.ring}
-          hover:brightness-95 active:scale-95
-          disabled:opacity-60 disabled:cursor-wait
+          ${readOnly ? "" : "hover:brightness-95 active:scale-95"}
+          disabled:opacity-60 disabled:cursor-not-allowed
         `}
-        title="点击切换状态"
-        aria-label={`状态：${STATUS_LABELS[status]}，点击修改`}
+        title={readOnly ? STATUS_LABELS[status] : "点击切换状态"}
+        aria-label={`状态：${STATUS_LABELS[status]}${readOnly ? "" : "，点击修改"}`}
       >
         {saving ? (
           <span className="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin" />

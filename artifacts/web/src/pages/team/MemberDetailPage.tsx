@@ -1,13 +1,13 @@
 /**
  * MemberDetailPage — 学生详情页（/home/members/:id）
  *
- * Layout:
- *   粘性面包屑栏
- *   Profile hero card
- *   Section × 4（基本信息 / 论文 / 实验记录 / 周报）
+ * 权限说明：
+ * - 所有已登录用户可以查看任何学生的信息（团队透明）
+ * - 导师(instructor)可以编辑所有学生的信息
+ * - 学生本人也可以编辑自己的信息
+ * - 具体权限规则在 @/lib/permissions/policies.ts 中集中管理
  *
  * Layer: page
- * Deps: useStudentDetail (hook), ProfileCard, SectionHeading (shared), 4 × Card
  */
 
 import { useState } from "react";
@@ -17,10 +17,11 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useStudentDetail }  from "../../hooks/team/useStudentDetail";
-import { useSciNoteStore }   from "../../contexts/SciNoteStoreContext";
+import { useStudentDetail }  from "@/hooks/team/useStudentDetail";
+import { useSciNoteStore }   from "@/contexts/SciNoteStoreContext";
+import { useStudentPermissions } from "@/lib/permissions/usePermissions";
 import { ProfileCard }       from "./detail/ProfileCard";
-import { SectionHeading }    from "../../components/team/SectionHeading";
+import { SectionHeading }    from "@/components/team/SectionHeading";
 import BasicInfoCard         from "./detail/BasicInfoCard";
 import PapersCard            from "./detail/PapersCard";
 import ExperimentRecordsCard from "./detail/ExperimentRecordsCard";
@@ -35,6 +36,9 @@ export default function MemberDetailPage() {
 
   const [paperCount,  setPaperCount]  = useState(0);
   const [reportCount, setReportCount] = useState(0);
+
+  // 使用集中式权限系统获取所有权限
+  const perms = useStudentPermissions(student?.userId ?? null);
 
   if (loading) {
     return (
@@ -82,16 +86,27 @@ export default function MemberDetailPage() {
           reportCount={reportCount}
           noteCount={notes.length}
           onStudentChange={setStudent}
+          canEditStatus={perms.canEditStatus}
         />
 
         <section>
           <SectionHeading icon={<FileText size={12} />} title="基本信息" />
-          <BasicInfoCard student={student} onUpdated={setStudent} />
+          <BasicInfoCard 
+            student={student} 
+            onUpdated={setStudent} 
+            canEdit={perms.canEditProfile} 
+          />
         </section>
 
         <section>
           <SectionHeading icon={<BookOpen size={12} />} title="论文信息" count={paperCount} />
-          <PapersCard studentId={student.id} onCountChange={setPaperCount} />
+          <PapersCard 
+            studentId={student.id} 
+            onCountChange={setPaperCount} 
+            canAdd={perms.canAddPaper}
+            canEdit={perms.canEditPaper}
+            canDelete={perms.canDeletePaper}
+          />
         </section>
 
         <section>
@@ -101,7 +116,11 @@ export default function MemberDetailPage() {
 
         <section>
           <SectionHeading icon={<ScrollText size={12} />} title="周报" count={reportCount} />
-          <WeeklyReportsCard studentId={student.id} onCountChange={setReportCount} />
+          <WeeklyReportsCard 
+            studentId={student.id} 
+            onCountChange={setReportCount}
+            canAdd={perms.canAddReport}
+          />
         </section>
 
       </div>

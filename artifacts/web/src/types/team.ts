@@ -52,6 +52,8 @@ export interface Student {
   email: string | null;
   status: StudentStatus;
   createdAt: string;
+  /** 关联的用户账户ID (users.id)，用于权限判断 */
+  userId: string | null;
 }
 
 // ---------------------------------------------------------------------------

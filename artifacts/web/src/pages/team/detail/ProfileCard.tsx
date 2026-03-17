@@ -57,6 +57,7 @@ export interface ProfileCardProps {
   reportCount:    number;
   noteCount:      number;
   onStudentChange: (updated: Student) => void;
+  canEditStatus?: boolean;
 }
 
 export function ProfileCard({
@@ -65,6 +66,7 @@ export function ProfileCard({
   reportCount,
   noteCount,
   onStudentChange,
+  canEditStatus = false,
 }: ProfileCardProps) {
   const pal = palette(student.name);
 
@@ -109,12 +111,13 @@ export function ProfileCard({
               <span className="text-[10px] text-gray-400 font-medium">
                 {student.enrollmentYear} 级
               </span>
-              {/* Interactive status tag */}
+              {/* Status tag - editable only for instructor */}
               <StudentStatusTag
                 status={student.status}
                 onSave={handleStatusSave}
                 stopPropagation={false}
                 compact
+                readOnly={!canEditStatus}
               />
             </div>
 

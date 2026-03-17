@@ -18,6 +18,9 @@ import { PaperEditForm }    from "./PaperEditForm";
 interface Props {
   studentId:      string;
   onCountChange?: (count: number) => void;
+  canAdd?:        boolean;
+  canEdit?:       boolean;
+  canDelete?:     boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -30,6 +33,9 @@ interface SectionProps {
   items:      Paper[];
   adding:     "published" | "thesis" | null;
   editing:    Paper | null;
+  canAdd:     boolean;
+  canEdit:    boolean;
+  canDelete:  boolean;
   onAdd:      (type: "published" | "thesis") => void;
   onEdit:     (p: Paper) => void;
   onSaveNew:  (data: AddPaperRequest) => Promise<void>;
@@ -39,7 +45,7 @@ interface SectionProps {
 }
 
 function PaperSection({
-  title, isThesis, items, adding, editing,
+  title, isThesis, items, adding, editing, canAdd, canEdit, canDelete,
   onAdd, onEdit, onSaveNew, onSaveEdit, onDelete, onCancel,
 }: SectionProps) {
   const typeKey  = isThesis ? "thesis" : "published";
@@ -49,12 +55,14 @@ function PaperSection({
     <div className="mb-4 last:mb-0">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-medium text-gray-400">{title}</span>
-        <button
-          onClick={() => onAdd(typeKey)}
-          className="inline-flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full px-2 py-0.5 transition-colors"
-        >
-          <Plus size={10} /> 上传
-        </button>
+        {canAdd && (
+          <button
+            onClick={() => onAdd(typeKey)}
+            className="inline-flex items-center gap-0.5 text-xs text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full px-2 py-0.5 transition-colors"
+          >
+            <Plus size={10} /> 上传
+          </button>
+        )}
       </div>
 
       {isAdding && (
@@ -85,6 +93,8 @@ function PaperSection({
               <PaperViewCard
                 key={p.id}
                 paper={p}
+                canEdit={canEdit}
+                canDelete={canDelete}
                 onEdit={() => onEdit(p)}
                 onDelete={() => onDelete(p.id)}
               />
@@ -100,7 +110,7 @@ function PaperSection({
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function PapersCard({ studentId, onCountChange }: Props) {
+export default function PapersCard({ studentId, onCountChange, canAdd = false, canEdit = false, canDelete = false }: Props) {
   const { papers, loading, addNewPaper, removePaper, replacePaper } =
     usePapers(studentId, onCountChange);
 
@@ -129,7 +139,7 @@ export default function PapersCard({ studentId, onCountChange }: Props) {
   }
 
   const sectionProps = {
-    adding, editing,
+    adding, editing, canAdd, canEdit, canDelete,
     onAdd:      (type: "published" | "thesis") => { setAdding(type); setEditing(null); },
     onEdit:     (p: Paper) => { setEditing(p); setAdding(null); },
     onSaveNew:  handleSaveNew,

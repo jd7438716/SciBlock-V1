@@ -1,15 +1,23 @@
 import type { LucideIcon } from "lucide-react";
 import { Home, Mail, Users, FileText, ClipboardList } from "lucide-react";
+import type { ResourceType } from "@/types/permissions";
 
 export interface NavItem {
   label: string;
   href: string;
   Icon: LucideIcon;
-  /** When set, only users whose role is in this list will see this item. */
+  /** 
+   * 所需权限资源（使用权限系统）
+   * @deprecated 推荐使用 permission 字段替代 roles
+   */
   roles?: string[];
+  /** 权限检查配置 */
+  permission?: {
+    resource: ResourceType;
+    action?: 'view' | 'manage';
+  };
 }
 
-// An optional inline action button that appears to the right of a group title.
 export interface NavGroupAction {
   label: string;
   href: string;
@@ -18,34 +26,38 @@ export interface NavGroupAction {
 export interface NavGroup {
   title: string;
   items: NavItem[];
-  // When set, renders an action button (e.g. "+") next to the group title.
   action?: NavGroupAction;
 }
 
-// Top-level flat items (no group header).
+// 顶部导航（所有已登录用户可见）
 export const TOP_NAV: NavItem[] = [
   { label: "主页", href: "/home", Icon: Home },
   { label: "消息", href: "/home/messages", Icon: Mail },
 ];
 
-// Group sections rendered below the top nav.
-// "个人" items are populated dynamically from useSciNotes — its static items array stays empty here.
+// 分组导航
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: "团队",
     items: [
       { label: "成员管理", href: "/home/members", Icon: Users },
-      { label: "周报管理", href: "/home/reports", Icon: ClipboardList, roles: ["instructor"] },
+      { 
+        label: "周报管理", 
+        href: "/home/reports", 
+        Icon: ClipboardList,
+        // 使用新的权限系统 - 仅导师可见
+        permission: { resource: 'nav.team_reports', action: 'view' },
+      },
     ],
   },
   {
     title: "个人",
-    items: [], // injected at runtime by AppSidebar via useSciNotes
+    items: [],
     action: { label: "新建 SciNote", href: "/personal/new-experiment" },
   },
 ];
 
-// Static personal nav items (rendered in AppSidebar above SciNotes)
+// 个人静态导航
 export const PERSONAL_STATIC_NAV: NavItem[] = [
   { label: "我的周报", href: "/personal/my-reports", Icon: FileText },
 ];
