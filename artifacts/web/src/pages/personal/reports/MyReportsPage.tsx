@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ReportListPanel } from "./ReportListPanel";
 import { ReportWorkPanel } from "./ReportWorkPanel";
 import { useMyReports, useCurrentStudentProfile, getCurrentWeekDefaults } from "@/hooks/reports/useMyReports";
 import { useCurrentUser } from "@/contexts/UserContext";
 import type { WeeklyReport } from "@/types/weeklyReport";
-import { fmtDate } from "@/types/weeklyReport";
+import { fmtDate, addDaysToISODate } from "@/types/weeklyReport";
 
 // ---------------------------------------------------------------------------
 // New report dialog (inline)
@@ -15,11 +15,26 @@ interface NewReportDialogProps {
   onCancel: () => void;
 }
 
+/** Check if a date string is Monday (weekStart) */
+function isMonday(isoDate: string): boolean {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getDay() === 1; // 1 = Monday
+}
+
 function NewReportForm({ onConfirm, onCancel }: NewReportDialogProps) {
   const { weekStart, weekEnd } = getCurrentWeekDefaults();
   const [title, setTitle] = useState(`周报 ${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`);
   const [ws, setWs] = useState(weekStart);
-  const [we, setWe] = useState(weekEnd);
+  // 结束日期自动根据开始日期计算（+6天）
+  const we = useMemo(() => addDaysToISODate(ws, 6), [ws]);
+
+  // 日期限制：只允许选择过去4周到未来2周内的周一
+  const maxDate = useMemo(() => addDaysToISODate(getCurrentWeekDefaults().weekStart, 14), []);
+  const minDate = useMemo(() => addDaysToISODate(getCurrentWeekDefaults().weekStart, -28), []);
+
+  const isValid = isMonday(ws);
+  const errorMsg = isValid ? null : "开始日期必须是周一";
 
   return (
     <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -37,21 +52,29 @@ function NewReportForm({ onConfirm, onCancel }: NewReportDialogProps) {
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">开始日期</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">开始日期（周一）</label>
               <input
                 type="date"
                 value={ws}
+                min={minDate}
+                max={maxDate}
                 onChange={(e) => setWs(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={[
+                  "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  isValid
+                    ? "border-gray-300 focus:ring-blue-500"
+                    : "border-red-300 focus:ring-red-500 bg-red-50",
+                ].join(" ")}
               />
+              {errorMsg && <p className="text-xs text-red-500 mt-1">{errorMsg}</p>}
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">结束日期</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">结束日期（周日）</label>
               <input
                 type="date"
                 value={we}
-                onChange={(e) => setWe(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled
+                className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
               />
             </div>
           </div>
@@ -64,7 +87,13 @@ function NewReportForm({ onConfirm, onCancel }: NewReportDialogProps) {
             </button>
             <button
               onClick={() => onConfirm(title.trim() || "新周报", ws, we)}
-              className="flex-1 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+              disabled={!isValid}
+              className={[
+                "flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                isValid
+                  ? "bg-gray-900 text-white hover:bg-gray-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed",
+              ].join(" ")}
             >
               创建草稿
             </button>
