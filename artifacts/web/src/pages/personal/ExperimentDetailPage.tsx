@@ -355,15 +355,24 @@ function Step6Section({ step6 }: { step6: Step6Data }) {
 
 export function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { notes } = useSciNoteStore();
+  const { notes, loading } = useSciNoteStore();
   const note = notes.find((n) => n.id === id);
 
   if (!note) {
     return (
       <AppLayout title="实验记录">
         <div className="flex flex-col items-center justify-center h-64 text-center">
-          <BookOpen size={36} className="text-gray-300 mb-4" />
-          <p className="text-sm font-medium text-gray-500">找不到该实验记录</p>
+          {loading ? (
+            <>
+              <div className="w-6 h-6 rounded-full border-2 border-gray-200 border-t-gray-400 animate-spin mb-4" />
+              <p className="text-sm text-gray-400">加载中…</p>
+            </>
+          ) : (
+            <>
+              <BookOpen size={36} className="text-gray-300 mb-4" />
+              <p className="text-sm font-medium text-gray-500">找不到该实验记录</p>
+            </>
+          )}
         </div>
       </AppLayout>
     );
