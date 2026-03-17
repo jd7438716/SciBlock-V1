@@ -102,7 +102,7 @@ export default function MemberDetailPage() {
 
         <section>
           <SectionHeading icon={<FlaskConical size={12} />} title="实验记录" count={notes.length} />
-          <ExperimentRecordsCard />
+          <ExperimentRecordsCard memberId={id ?? ""} />
         </section>
 
         <section>

@@ -87,7 +87,13 @@ function RecordRow({ note, onClick }: { note: SciNote; onClick: () => void }) {
 // Main component (no wrapper card — section wrapper is in MemberDetailPage)
 // ---------------------------------------------------------------------------
 
-export default function ExperimentRecordsCard() {
+interface ExperimentRecordsCardProps {
+  /** memberId from the parent route (/home/members/:memberId).
+   *  Used to build the navigation URL to the per-project experiment list. */
+  memberId: string;
+}
+
+export default function ExperimentRecordsCard({ memberId }: ExperimentRecordsCardProps) {
   const { notes } = useSciNoteStore();
   const [, navigate] = useLocation();
   const [showAll, setShowAll] = useState(false);
@@ -112,7 +118,11 @@ export default function ExperimentRecordsCard() {
           <RecordRow
             key={note.id}
             note={note}
-            onClick={() => navigate(`/personal/note/${note.id}`)}
+            onClick={() =>
+              navigate(
+                `/home/members/${memberId}/scinotes/${note.id}/experiments`,
+              )
+            }
           />
         ))}
       </div>

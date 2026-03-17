@@ -11,6 +11,7 @@ import { HomePage } from "@/pages/HomePage";
 import { MessagesPage } from "@/pages/messages/MessagesPage";
 import MembersPage from "@/pages/team/MembersPage";
 import MemberDetailPage from "@/pages/team/MemberDetailPage";
+import { SciNoteExperimentsPage } from "@/pages/team/SciNoteExperimentsPage";
 import { NewExperimentPage } from "@/pages/personal/NewExperimentPage";
 import { ReinitializeExperimentPage } from "@/pages/personal/ReinitializeExperimentPage";
 import { SciNoteDetailPage } from "@/pages/personal/SciNoteDetailPage";
@@ -34,6 +35,7 @@ function AuthenticatedRouter() {
         {/* Messages inbox */}
         <Route path="/home/messages" component={MessagesPage} />
         {/* Team members */}
+        <Route path="/home/members/:memberId/scinotes/:sciNoteId/experiments" component={SciNoteExperimentsPage} />
         <Route path="/home/members/:id" component={MemberDetailPage} />
         <Route path="/home/members" component={MembersPage} />
         {/* Team reports (instructor view) */}
