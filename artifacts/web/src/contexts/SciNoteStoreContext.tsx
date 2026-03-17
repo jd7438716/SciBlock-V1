@@ -9,7 +9,6 @@ import {
   createSciNoteApi,
   updateSciNote,
   deleteSciNoteApi,
-  type ApiSciNote,
 } from "@/api/scinotes";
 
 /**
@@ -29,19 +28,6 @@ import {
  * Dependency rule: this context imports from data/ and api/ only.
  *                  It must NOT import from WorkbenchContext or TrashContext.
  */
-
-function apiSciNoteToLocal(n: ApiSciNote): SciNote {
-  return {
-    id: n.id,
-    title: n.title,
-    kind: n.kind === "wizard" ? "wizard" : "placeholder",
-    createdAt: n.createdAt,
-    updatedAt: n.updatedAt,
-    experimentType: n.experimentType ?? undefined,
-    objective: n.objective ?? undefined,
-    formData: n.formData ?? undefined,
-  };
-}
 
 interface SciNoteStoreContextValue {
   notes: SciNote[];
@@ -80,11 +66,10 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     let cancelled = false;
     listSciNotes()
-      .then((res) => {
+      .then((notes) => {
         if (cancelled) return;
-        const apiNotes = res.items.map(apiSciNoteToLocal);
-        setNotes(apiNotes);
-        saveSciNotes(apiNotes);
+        setNotes(notes);
+        saveSciNotes(notes);
         setApiReady(true);
       })
       .catch(() => {
@@ -118,14 +103,13 @@ export function SciNoteStoreProvider({ children }: { children: React.ReactNode }
     const objective = fields.find((f) => f.name === "实验目标")?.value?.trim() || undefined;
 
     if (apiReady) {
-      const created = await createSciNoteApi({
+      const newNote = await createSciNoteApi({
         title,
         kind: "wizard",
         experimentType,
         objective,
         formData,
       });
-      const newNote = apiSciNoteToLocal(created);
       setNotes((prev) => [newNote, ...prev]);
       return newNote.id;
     }
