@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Pencil, Sparkles, X } from "lucide-react";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
+import { useAiTitleAssist } from "@/hooks/useAiTitleAssist";
 import { ExperimentTitleAssist } from "./ExperimentTitleAssist";
 import { StatusPicker } from "./StatusPicker";
 
@@ -23,9 +24,9 @@ export function ExperimentHeader() {
     updateExperimentCode,
     addTag,
     removeTag,
-    aiAssistOpen,
-    setAiAssistOpen,
   } = useWorkbench();
+
+  const assist = useAiTitleAssist();
 
   const [tagInput, setTagInput] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
@@ -49,12 +50,10 @@ export function ExperimentHeader() {
 
   function openTagInput() {
     setIsAddingTag(true);
-    // Defer focus so the input is rendered before we try to focus it
     setTimeout(() => tagInputRef.current?.focus(), 0);
   }
 
   function handleTagInputBlur() {
-    // Collapse the input back to the ghost chip when the user leaves without typing
     if (tagInput === "") setIsAddingTag(false);
   }
 
@@ -83,10 +82,10 @@ export function ExperimentHeader() {
           {/* AI assist toggle */}
           <button
             title="AI 辅助生成标题"
-            onClick={() => setAiAssistOpen(!aiAssistOpen)}
+            onClick={() => assist.setAiAssistOpen(!assist.aiAssistOpen)}
             className={[
               "flex-shrink-0 p-1 rounded transition-colors",
-              aiAssistOpen
+              assist.aiAssistOpen
                 ? "bg-gray-900 text-white"
                 : "text-gray-300 hover:text-gray-700",
             ].join(" ")}
@@ -96,7 +95,7 @@ export function ExperimentHeader() {
         </div>
 
         {/* AI assist popover anchored below the title row */}
-        <ExperimentTitleAssist />
+        <ExperimentTitleAssist {...assist} />
       </div>
 
       {/* Row 2: Status badge + experiment code */}

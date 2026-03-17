@@ -1,6 +1,14 @@
 import React, { useRef, useEffect } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
-import { useWorkbench } from "@/contexts/WorkbenchContext";
+
+export interface ExperimentTitleAssistProps {
+  aiAssistOpen: boolean;
+  setAiAssistOpen: (open: boolean) => void;
+  purposeInput: string;
+  setPurposeInput: (v: string) => void;
+  isGenerating: boolean;
+  runAiAssist: () => void;
+}
 
 /**
  * ExperimentTitleAssist — small floating popover anchored to the AI icon button.
@@ -8,17 +16,18 @@ import { useWorkbench } from "@/contexts/WorkbenchContext";
  * Appears when aiAssistOpen=true. Lets the user type a brief experiment purpose,
  * then calls runAiAssist() which mock-generates a title, inserts a purpose
  * paragraph into the editor, and highlights related ontology modules.
+ *
+ * All state and logic live in useAiTitleAssist (called by ExperimentHeader).
+ * This component is purely presentational.
  */
-export function ExperimentTitleAssist() {
-  const {
-    aiAssistOpen,
-    setAiAssistOpen,
-    purposeInput,
-    setPurposeInput,
-    isGenerating,
-    runAiAssist,
-  } = useWorkbench();
-
+export function ExperimentTitleAssist({
+  aiAssistOpen,
+  setAiAssistOpen,
+  purposeInput,
+  setPurposeInput,
+  isGenerating,
+  runAiAssist,
+}: ExperimentTitleAssistProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

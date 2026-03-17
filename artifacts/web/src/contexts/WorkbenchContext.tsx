@@ -26,7 +26,6 @@ import {
 import {
   createExperimentRecord,
   createExperimentRecordWithModules,
-  mockPurposeAssist,
   generateFlowDraft,
 } from "@/data/workbenchUtils";
 import {
@@ -102,24 +101,20 @@ interface WorkbenchContextValue {
   setModuleHighlights: (keys: OntologyModuleKey[]) => void;
   clearHighlights: () => void;
 
-  // AI title assist
-  aiAssistOpen: boolean;
-  setAiAssistOpen: (open: boolean) => void;
-  purposeInput: string;
-  setPurposeInput: (v: string) => void;
-  isGenerating: boolean;
-  runAiAssist: () => void;
-
   // Flow draft
   flowDraftInserted: boolean;
 
   /**
    * EditorPanel calls this on mount to register a function that can
    * insert HTML at the top of the TipTap document.
-   * WorkbenchContext calls it when AI or flow-draft logic triggers.
+   * WorkbenchContext calls it when flow-draft logic triggers.
    */
   registerEditorInsert: (fn: (html: string) => void) => void;
   unregisterEditorInsert: () => void;
+  /** Insert arbitrary HTML at the top of the editor (used by AI title assist). */
+  insertIntoEditor: (html: string) => void;
+  /** Persist the typed purpose to the current experiment record. */
+  savePurposeInput: (v: string) => void;
 
   // AI Report
   /** Derived from isGeneratingReport + currentRecord.reportHtml */
@@ -249,11 +244,6 @@ export function WorkbenchProvider({
   // Layout
   const [focusMode, setFocusMode] = useState<WorkbenchFocusMode>("balanced");
   const [activeModuleKey, setActiveModuleKey] = useState<OntologyModuleKey>("system");
-
-  // AI title assist
-  const [aiAssistOpen, setAiAssistOpen] = useState(false);
-  const [purposeInput, setPurposeInput] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
 
   // Flow draft
   const [flowDraftInserted, setFlowDraftInserted] = useState(false);
@@ -402,7 +392,6 @@ export function WorkbenchProvider({
     if (records.find((r) => r.id === recordId)) {
       setCurrentRecordId(recordId);
       setFlowDraftInserted(false);
-      setAiAssistOpen(false);
     }
   }
 
@@ -419,7 +408,6 @@ export function WorkbenchProvider({
     const nextRecord = idx > 0 ? records[idx - 1] : records[idx + 1];
     setCurrentRecordId(nextRecord.id);
     setFlowDraftInserted(false);
-    setAiAssistOpen(false);
 
     // Remove from local active list
     setRecords((prev) => prev.filter((r) => r.id !== recordId));
@@ -445,8 +433,6 @@ export function WorkbenchProvider({
     setRecords((prev) => [...prev, localRecord]);
     setCurrentRecordId(localRecord.id);
     setFlowDraftInserted(false);
-    setAiAssistOpen(false);
-    setPurposeInput("");
     clearHighlights();
 
     // POST to API async; swap only the ID on success, preserving local content.
@@ -683,27 +669,17 @@ export function WorkbenchProvider({
   });
 
   // ---------------------------------------------------------------------------
-  // AI title assist
+  // Editor / AI assist bridge helpers (exposed to context consumers)
   // ---------------------------------------------------------------------------
 
-  function runAiAssist() {
-    if (!purposeInput.trim() || isGenerating) return;
-    setIsGenerating(true);
+  /** Insert arbitrary HTML at the top of the TipTap editor. */
+  function insertIntoEditor(html: string) {
+    editorInsertRef.current?.(html);
+  }
 
-    setTimeout(() => {
-      const result = mockPurposeAssist(purposeInput);
-
-      updateTitle(result.generatedTitle);
-      setModuleHighlights(result.highlightedModuleKeys);
-
-      const purposeHtml = `<h3>实验目的</h3><p>${result.purposeDraft}</p><hr>`;
-      editorInsertRef.current?.(purposeHtml);
-
-      patchCurrentRecord({ purposeInput });
-      setIsGenerating(false);
-      setAiAssistOpen(false);
-      setPurposeInput("");
-    }, 900);
+  /** Persist the typed purpose string to the current experiment record. */
+  function savePurposeInput(v: string) {
+    patchCurrentRecord({ purposeInput: v });
   }
 
   // ---------------------------------------------------------------------------
@@ -734,15 +710,11 @@ export function WorkbenchProvider({
     setModuleStatus,
     setModuleHighlights,
     clearHighlights,
-    aiAssistOpen,
-    setAiAssistOpen,
-    purposeInput,
-    setPurposeInput,
-    isGenerating,
-    runAiAssist,
     flowDraftInserted,
     registerEditorInsert,
     unregisterEditorInsert,
+    insertIntoEditor,
+    savePurposeInput,
     reportStatus,
     triggerReportGeneration,
     updateReport,
