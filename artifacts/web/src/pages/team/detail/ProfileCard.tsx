@@ -57,8 +57,10 @@ export interface ProfileCardProps {
   reportCount:     number;
   noteCount:       number;
   onStudentChange: (updated: Student) => void;
-  /** When false, the status tag is read-only and cannot be clicked. */
+  /** When false, all editing is hidden (profile belongs to someone else). */
   canEdit?:        boolean;
+  /** Only instructors can change degree/status administrative fields. */
+  isInstructor?:   boolean;
 }
 
 export function ProfileCard({
@@ -67,7 +69,8 @@ export function ProfileCard({
   reportCount,
   noteCount,
   onStudentChange,
-  canEdit = true,
+  canEdit      = true,
+  isInstructor = false,
 }: ProfileCardProps) {
   const pal = palette(student.name);
 
@@ -118,7 +121,7 @@ export function ProfileCard({
                 onSave={handleStatusSave}
                 stopPropagation={false}
                 compact
-                readonly={!canEdit}
+                readonly={!isInstructor}
               />
             </div>
 

@@ -14,12 +14,14 @@ import { DEGREE_OPTIONS } from "../../../types/team";
 import { updateStudent } from "../../../api/team";
 
 export interface BasicInfoEditFormProps {
-  student:  Student;
-  onSave:   (updated: Student) => void;
-  onCancel: () => void;
+  student:        Student;
+  onSave:         (updated: Student) => void;
+  onCancel:       () => void;
+  /** When false, the degree selector is hidden (student cannot change their degree). */
+  showDegreeEdit?: boolean;
 }
 
-export function BasicInfoEditForm({ student, onSave, onCancel }: BasicInfoEditFormProps) {
+export function BasicInfoEditForm({ student, onSave, onCancel, showDegreeEdit = true }: BasicInfoEditFormProps) {
   const [form, setForm] = useState({ ...student });
   const [saving, setSaving] = useState(false);
 
@@ -33,7 +35,7 @@ export function BasicInfoEditForm({ student, onSave, onCancel }: BasicInfoEditFo
     try {
       const { student: updated } = await updateStudent(student.id, {
         name:           form.name,
-        degree:         form.degree,
+        ...(showDegreeEdit ? { degree: form.degree } : {}),
         enrollmentYear: form.enrollmentYear,
         phone:          form.phone  ?? undefined,
         email:          form.email  ?? undefined,
@@ -86,26 +88,28 @@ export function BasicInfoEditForm({ student, onSave, onCancel }: BasicInfoEditFo
           />
         </div>
 
-        {/* Degree */}
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-gray-500">当前学位</span>
-          <div className="flex gap-1.5 flex-wrap">
-            {DEGREE_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => set("degree", opt.value)}
-                className={`text-xs font-medium border rounded-full px-3 py-1 leading-none transition-colors ${
-                  form.degree === opt.value
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+        {/* Degree — instructor only */}
+        {showDegreeEdit && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-gray-500">当前学位</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {DEGREE_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => set("degree", opt.value)}
+                  className={`text-xs font-medium border rounded-full px-3 py-1 leading-none transition-colors ${
+                    form.degree === opt.value
+                      ? "bg-gray-900 text-white border-gray-900"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-gray-500"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Enrollment year */}
         <div className="flex flex-col gap-1">

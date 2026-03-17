@@ -118,11 +118,12 @@ export default function MemberDetailPage() {
         noteCount={notes.length}
         onStudentChange={setStudent}
         canEdit={canEdit}
+        isInstructor={isInstructor}
       />
 
       <section>
         <SectionHeading icon={<FileText size={12} />} title="基本信息" />
-        <BasicInfoCard student={student} onUpdated={setStudent} canEdit={canEdit} />
+        <BasicInfoCard student={student} onUpdated={setStudent} canEdit={canEdit} isInstructor={isInstructor} />
       </section>
 
       <section>

@@ -18,10 +18,12 @@ import { DegreePicker }     from "./DegreePicker";
 import { BasicInfoEditForm } from "./BasicInfoEditForm";
 
 interface Props {
-  student:   Student;
-  onUpdated: (s: Student) => void;
+  student:      Student;
+  onUpdated:    (s: Student) => void;
   /** When false, all edit affordances are hidden; card is read-only. */
-  canEdit?:  boolean;
+  canEdit?:     boolean;
+  /** When false, degree-related editing is hidden (student cannot change their own degree). */
+  isInstructor?: boolean;
 }
 
 async function patchStudent(id: string, patch: UpdateStudentRequest): Promise<Student> {
@@ -29,7 +31,7 @@ async function patchStudent(id: string, patch: UpdateStudentRequest): Promise<St
   return student;
 }
 
-export default function BasicInfoCard({ student, onUpdated, canEdit = true }: Props) {
+export default function BasicInfoCard({ student, onUpdated, canEdit = true, isInstructor = false }: Props) {
   const [editingFull,   setEditingFull]   = useState(false);
   const [editingDegree, setEditingDegree] = useState(false);
 
@@ -44,6 +46,7 @@ export default function BasicInfoCard({ student, onUpdated, canEdit = true }: Pr
         student={student}
         onSave={s => { onUpdated(s); setEditingFull(false); }}
         onCancel={() => setEditingFull(false)}
+        showDegreeEdit={isInstructor}
       />
     );
   }
@@ -52,13 +55,13 @@ export default function BasicInfoCard({ student, onUpdated, canEdit = true }: Pr
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm group">
       {/* Header row */}
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-50">
-        {canEdit && editingDegree ? (
+        {canEdit && isInstructor && editingDegree ? (
           <DegreePicker
             value={student.degree}
             onSave={async v => { await saveField({ degree: v }); setEditingDegree(false); }}
             onCancel={() => setEditingDegree(false)}
           />
-        ) : canEdit ? (
+        ) : canEdit && isInstructor ? (
           <button
             onClick={() => setEditingDegree(true)}
             className="flex-shrink-0 text-[10px] font-semibold border rounded-md px-2 py-1 leading-none whitespace-nowrap bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 transition-colors"

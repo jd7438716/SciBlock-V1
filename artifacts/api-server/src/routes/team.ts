@@ -114,9 +114,15 @@ router.patch("/members/:id", async (req, res) => {
   if (phone !== undefined) patch.phone = phone;
   if (email !== undefined) patch.email = email;
   if (enrollmentYear !== undefined) patch.enrollmentYear = enrollmentYear;
-  if (degree !== undefined) patch.degree = degree;
   if (researchTopic !== undefined) patch.researchTopic = researchTopic;
-  if (status !== undefined) patch.status = status;
+
+  // degree and status are instructor-only administrative fields.
+  // For non-instructors (students editing their own profile), these are silently
+  // dropped even if the client sends them.
+  if (res.locals.role === "instructor") {
+    if (degree !== undefined) patch.degree = degree;
+    if (status !== undefined) patch.status = status;
+  }
 
   try {
     const [updated] = await db
