@@ -89,21 +89,42 @@ export function parseReportContent(report: WeeklyReport): WeeklyReportContent {
   return { ...EMPTY_REPORT_CONTENT, completed: report.content };
 }
 
+/** Format Date as YYYY-MM-DD using local date components. */
+function fmtLocalISO(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 /** Returns the Monday (ISO) of the week containing `date`. */
 export function getWeekMonday(date: Date): string {
   const d = new Date(date);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return fmtLocalISO(d);
 }
 
 /** Returns the Sunday (ISO) of the week containing `date`. */
 export function getWeekSunday(date: Date): string {
-  const monday = getWeekMonday(date);
-  const d = new Date(monday + "T00:00:00");
+  const mondayStr = getWeekMonday(date);
+  // Parse mondayStr as local date
+  const [year, month, day] = mondayStr.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
   d.setDate(d.getDate() + 6);
-  return d.toISOString().slice(0, 10);
+  return fmtLocalISO(d);
+}
+
+/** Add/subtract days to an ISO date string, returning new ISO date (local timezone). */
+export function addDaysToISODate(isoDate: string, days: number): string {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const d = new Date(year, month - 1, day);
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
 /** Formats YYYY-MM-DD as "MM/DD" */
@@ -119,7 +140,9 @@ export function fmtWeekRange(weekStart: string, weekEnd: string | null): string 
 
 /** e.g. "2026-03-09" → "2026年 第11周" */
 export function fmtWeekLabel(weekStart: string): string {
-  const d = new Date(weekStart + "T00:00:00");
+  // Parse as local date to avoid timezone issues
+  const [y, m, day] = weekStart.split("-").map(Number);
+  const d = new Date(y, m - 1, day);
   const year = d.getFullYear();
   const startOfYear = new Date(year, 0, 1);
   const weekNum = Math.ceil(

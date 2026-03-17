@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { fetchTeamReports, updateReport, addReportComment } from "@/api/weeklyReport";
 import type { TeamReportsResponse } from "@/api/weeklyReport";
 import type { WeeklyReport, WeeklyReportStatus, AddWeeklyReportCommentPayload } from "@/types/weeklyReport";
-import { getWeekMonday, getWeekSunday } from "@/types/weeklyReport";
+import { getWeekMonday, getWeekSunday, addDaysToISODate } from "@/types/weeklyReport";
 
 export interface StudentWithReport {
   id: string;
@@ -63,19 +63,11 @@ export function useTeamReports(): UseTeamReportsReturn {
   }, []);
 
   const goToPrevWeek = useCallback(() => {
-    setWeekStartState((prev) => {
-      const d = new Date(prev + "T00:00:00");
-      d.setDate(d.getDate() - 7);
-      return d.toISOString().slice(0, 10);
-    });
+    setWeekStartState((prev) => addDaysToISODate(prev, -7));
   }, []);
 
   const goToNextWeek = useCallback(() => {
-    setWeekStartState((prev) => {
-      const d = new Date(prev + "T00:00:00");
-      d.setDate(d.getDate() + 7);
-      return d.toISOString().slice(0, 10);
-    });
+    setWeekStartState((prev) => addDaysToISODate(prev, 7));
   }, []);
 
   const students: StudentWithReport[] = (data?.students ?? []).map((s) => {
