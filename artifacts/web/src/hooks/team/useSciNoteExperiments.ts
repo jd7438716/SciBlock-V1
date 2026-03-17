@@ -3,7 +3,7 @@
  *
  * Layer: Business logic hook (no UI, wraps api/experiments.ts).
  *
- * Used by SciNoteExperimentsPage to populate the per-project experiment list.
+ * Used by MemberSciNoteExperimentsPanel to populate the per-project experiment list.
  * Returns ExperimentRecord[] (domain type) so callers never touch wire shapes.
  */
 

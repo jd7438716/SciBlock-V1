@@ -1,18 +1,25 @@
 /**
- * ExperimentRecordsCard — 实验记录（PrepItemViewCard 风格列表）
+ * ExperimentRecordsCard — SciNote（项目）列表入口组件。
  *
  * Layer: component
+ *
+ * 职责：展示当前 SciNote 列表，点击某个项目名触发 onSelectSciNote 回调，
+ * 由父组件（MemberDetailPage）决定如何响应（展开右侧面板）。
+ * 本组件不负责导航，不知道面板的存在。
+ *
+ * ⚠️  数据边界（已知限制）：
+ *   notes 来自 useSciNoteStore()，即当前登录用户的 SciNotes，
+ *   不是被查看成员的 SciNotes。补充真正的跨用户数据能力需要后端专用接口。
  */
 
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { useSciNoteStore } from "../../../contexts/SciNoteStoreContext";
 import type { SciNote } from "../../../types/scinote";
 
 const INITIAL_LIMIT = 5;
 
 // ---------------------------------------------------------------------------
-// Kind config (matches workbench)
+// Kind tag config
 // ---------------------------------------------------------------------------
 
 const KIND_META: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -28,49 +35,79 @@ function kindMeta(kind: SciNote["kind"]) {
 }
 
 // ---------------------------------------------------------------------------
-// Single record row
+// Single project row
 // ---------------------------------------------------------------------------
 
-function RecordRow({ note, onClick }: { note: SciNote; onClick: () => void }) {
+interface RecordRowProps {
+  note:       SciNote;
+  isSelected: boolean;
+  onClick:    () => void;
+}
+
+function RecordRow({ note, isSelected, onClick }: RecordRowProps) {
   const meta = kindMeta(note.kind);
+
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-sm group">
+    <div
+      className={[
+        "border rounded-xl shadow-sm group transition-colors",
+        isSelected
+          ? "bg-gray-900 border-gray-900"
+          : "bg-white border-gray-100 hover:border-gray-200",
+      ].join(" ")}
+    >
       <div className="flex items-center gap-2 px-3 py-2">
         {/* Kind tag */}
         <span
-          className={`flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap ${meta.bg} ${meta.text} ${meta.border}`}
+          className={[
+            "flex-shrink-0 text-[10px] font-medium border rounded px-1.5 py-0.5 leading-none whitespace-nowrap",
+            isSelected
+              ? "bg-white/10 text-white/80 border-white/20"
+              : `${meta.bg} ${meta.text} ${meta.border}`,
+          ].join(" ")}
         >
           {meta.label}
         </span>
 
-        {/* Title — click to navigate */}
+        {/* Title — click triggers onSelectSciNote */}
         <button
           onClick={onClick}
-          className="flex-1 text-sm font-medium text-gray-800 text-left hover:text-blue-700 transition-colors leading-snug min-w-0 truncate"
-          title="点击查看详情"
+          className={[
+            "flex-1 text-sm font-medium text-left leading-snug min-w-0 truncate transition-colors",
+            isSelected
+              ? "text-white"
+              : "text-gray-800 hover:text-blue-700",
+          ].join(" ")}
+          title={isSelected ? "点击收起" : "点击查看该项目下的实验记录"}
         >
           {note.title || "无标题实验"}
         </button>
 
-        {/* Date pill */}
-        {note.createdAt && (
+        {/* Date pill — only in unselected state */}
+        {note.createdAt && !isSelected && (
           <span className="flex-shrink-0 inline-flex items-center bg-slate-100 rounded-full px-2.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <span className="text-xs text-slate-500">
               {new Date(note.createdAt).toLocaleDateString("zh-CN", {
-                month: "2-digit", day: "2-digit",
+                month: "2-digit",
+                day:   "2-digit",
               })}
             </span>
           </span>
         )}
 
-        {/* Navigate arrow */}
-        <span className="text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0 text-sm">
-          ›
+        {/* Arrow / indicator */}
+        <span
+          className={[
+            "flex-shrink-0 text-sm transition-colors",
+            isSelected ? "text-white/60" : "text-gray-300 group-hover:text-gray-500",
+          ].join(" ")}
+        >
+          {isSelected ? "✕" : "›"}
         </span>
       </div>
 
-      {/* Attribute pill row */}
-      {note.createdAt && (
+      {/* Created at pill — only in unselected state */}
+      {note.createdAt && !isSelected && (
         <div className="px-3 pb-2 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center bg-slate-100 rounded-full px-2.5 py-0.5">
             <span className="text-xs text-slate-500">
@@ -84,22 +121,26 @@ function RecordRow({ note, onClick }: { note: SciNote; onClick: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Main component (no wrapper card — section wrapper is in MemberDetailPage)
+// Main component
 // ---------------------------------------------------------------------------
 
 interface ExperimentRecordsCardProps {
-  /** memberId from the parent route (/home/members/:memberId).
-   *  Used to build the navigation URL to the per-project experiment list. */
-  memberId: string;
+  /** Called when the user clicks a project row. Pass null to deselect. */
+  onSelectSciNote:   (note: SciNote) => void;
+  /** The currently selected SciNote ID; used for visual highlight. */
+  selectedSciNoteId: string | null;
 }
 
-export default function ExperimentRecordsCard({ memberId }: ExperimentRecordsCardProps) {
+export default function ExperimentRecordsCard({
+  onSelectSciNote,
+  selectedSciNoteId,
+}: ExperimentRecordsCardProps) {
   const { notes } = useSciNoteStore();
-  const [, navigate] = useLocation();
   const [showAll, setShowAll] = useState(false);
 
   const sorted = [...notes].sort(
-    (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
+    (a, b) =>
+      new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
   );
   const visible = showAll ? sorted : sorted.slice(0, INITIAL_LIMIT);
 
@@ -114,22 +155,19 @@ export default function ExperimentRecordsCard({ memberId }: ExperimentRecordsCar
   return (
     <div>
       <div className="flex flex-col gap-1.5">
-        {visible.map(note => (
+        {visible.map((note) => (
           <RecordRow
             key={note.id}
             note={note}
-            onClick={() =>
-              navigate(
-                `/home/members/${memberId}/scinotes/${note.id}/experiments`,
-              )
-            }
+            isSelected={note.id === selectedSciNoteId}
+            onClick={() => onSelectSciNote(note)}
           />
         ))}
       </div>
 
       {sorted.length > INITIAL_LIMIT && (
         <button
-          onClick={() => setShowAll(s => !s)}
+          onClick={() => setShowAll((s) => !s)}
           className="mt-2 w-full inline-flex items-center justify-center gap-0.5 text-xs text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full py-1 transition-colors"
         >
           {showAll ? "收起" : `查看全部 ${sorted.length} 条`}
