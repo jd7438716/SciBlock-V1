@@ -39,6 +39,19 @@ type ExperimentRecord struct {
         UpdatedAt          time.Time
 }
 
+// RecentExperimentRow is the result type for the cross-table recent-experiments query.
+// It joins experiment_records with sci_notes to produce the fields needed by
+// the home page feed without a frontend N+1 loop.
+type RecentExperimentRow struct {
+        ExperimentID     string
+        ExperimentTitle  string
+        SciNoteID        string
+        SciNoteTitle     string
+        ExperimentStatus ExperimentStatus
+        CreatedAt        time.Time
+        UpdatedAt        time.Time
+}
+
 // ExperimentPatch carries optional update fields for PATCH /api/experiments/:id.
 // Only non-nil fields are written to the database.
 // Tags nil = no change; Tags []string{} = clear to empty array.

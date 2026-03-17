@@ -8,39 +8,48 @@
 package repository
 
 import (
-	"context"
-	"encoding/json"
+        "context"
+        "encoding/json"
 
-	"sciblock/go-api/internal/domain"
+        "sciblock/go-api/internal/domain"
 )
 
 // ExperimentRepository defines all database operations for experiment_records.
 // The interface is the dependency boundary: services depend on this abstraction,
 // not on the concrete pgx implementation.
 type ExperimentRepository interface {
-	// ListBySciNote returns ExperimentRecords under the given SciNote.
-	// trashOnly=false → active records (is_deleted=false).
-	// trashOnly=true  → trash records (is_deleted=true).
-	ListBySciNote(ctx context.Context, sciNoteID string, trashOnly bool) ([]domain.ExperimentRecord, error)
+        // ListBySciNote returns ExperimentRecords under the given SciNote.
+        // trashOnly=false → active records (is_deleted=false).
+        // trashOnly=true  → trash records (is_deleted=true).
+        ListBySciNote(ctx context.Context, sciNoteID string, trashOnly bool) ([]domain.ExperimentRecord, error)
 
-	// GetByID retrieves a single ExperimentRecord by primary key.
-	// Returns nil, nil when not found.
-	GetByID(ctx context.Context, id string) (*domain.ExperimentRecord, error)
+        // GetByID retrieves a single ExperimentRecord by primary key.
+        // Returns nil, nil when not found.
+        GetByID(ctx context.Context, id string) (*domain.ExperimentRecord, error)
 
-	// Create inserts a new ExperimentRecord row and returns the persisted record.
-	Create(ctx context.Context, rec domain.ExperimentRecord) (*domain.ExperimentRecord, error)
+        // Create inserts a new ExperimentRecord row and returns the persisted record.
+        Create(ctx context.Context, rec domain.ExperimentRecord) (*domain.ExperimentRecord, error)
 
-	// Update applies a partial patch to an existing ExperimentRecord.
-	// Only non-nil fields in the patch are written.
-	Update(ctx context.Context, id string, patch domain.ExperimentPatch) (*domain.ExperimentRecord, error)
+        // Update applies a partial patch to an existing ExperimentRecord.
+        // Only non-nil fields in the patch are written.
+        Update(ctx context.Context, id string, patch domain.ExperimentPatch) (*domain.ExperimentRecord, error)
 
-	// UpdateModules replaces the current_modules jsonb column wholesale.
-	// Kept for potential future use by a module-level PATCH endpoint.
-	UpdateModules(ctx context.Context, id string, modules json.RawMessage) error
+        // UpdateModules replaces the current_modules jsonb column wholesale.
+        // Kept for potential future use by a module-level PATCH endpoint.
+        UpdateModules(ctx context.Context, id string, modules json.RawMessage) error
 
-	// SoftDelete sets is_deleted=true on the given ExperimentRecord.
-	SoftDelete(ctx context.Context, id string) error
+        // SoftDelete sets is_deleted=true on the given ExperimentRecord.
+        SoftDelete(ctx context.Context, id string) error
 
-	// Restore sets is_deleted=false on the given ExperimentRecord.
-	Restore(ctx context.Context, id string) error
+        // Restore sets is_deleted=false on the given ExperimentRecord.
+        Restore(ctx context.Context, id string) error
+
+        // ListRecentByUser returns the most recently updated active experiment records
+        // across all SciNotes owned by userID.  Each row includes the parent SciNote
+        // title so callers never need a follow-up query.
+        // Only records with is_deleted=false are included.
+        // Results are ordered by experiment updated_at DESC.
+        // limit must be between 1 and 50 (inclusive); the caller is responsible for
+        // clamping the value before calling this method.
+        ListRecentByUser(ctx context.Context, userID string, limit int) ([]domain.RecentExperimentRow, error)
 }

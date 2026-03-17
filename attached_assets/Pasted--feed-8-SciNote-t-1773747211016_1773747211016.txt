@@ -1,0 +1,174 @@
+现在开始正式开发“最近实验 feed”。
+
+目标
+把首页从“最近项目”升级为“最近实验”：
+- 展示最近 8 条实验记录
+- 每张卡片显示：
+  - 实验记录名
+  - 所属项目名（SciNote.title）
+  - 最近更新时间
+- 点击卡片后进入：
+  /personal/experiment/:sciNoteId/workbench?experimentId=:experimentId
+- workbench 打开后自动定位到对应 experiment
+
+开发要求
+必须按我们刚刚确认的工程规则执行：
+1. 不允许前端 N+1 聚合所有 SciNote 再拼 experiments
+2. 必须新增后端聚合接口
+3. 必须使用 API adapter / normalize 规则
+4. 不要让展示组件兼容“最近项目”和“最近实验”两套语义
+5. 不要把新逻辑塞进 WorkbenchContext
+6. Workbench 预选不能先稳定显示错误的第一条记录，再切到目标记录
+
+请按下面顺序开发，并在每一步完成后用“已完成第 X 步”的格式回复我当前结果，不要一口气闷头全改完才汇报。
+
+第 1 步：后端聚合接口
+实现：
+GET /api/experiments/recent?limit=8
+
+要求：
+- 严格按现有 Go 项目真实文件结构落点，不要平行新建一套 experiment 文件
+- repository 层负责 SQL
+- service 层只做协调
+- handler 层做 query param 解析、limit 校验、userID 获取
+- 必须过滤 is_deleted = false
+- 必须按 user_id 严格隔离
+- limit:
+  - 默认 8
+  - 非数字 → 400
+  - <= 0 → 400
+  - > 50 → 截断到 50
+
+接口返回结构先确定为：
+{
+  "items": [
+    {
+      "experimentId": "uuid",
+      "experimentTitle": "xxx",
+      "sciNoteId": "uuid",
+      "sciNoteTitle": "xxx",
+      "updatedAt": "ISO",
+      "createdAt": "ISO",
+      "experimentStatus": "可选"
+    }
+  ]
+}
+
+完成后回复：
+1. 新增/修改了哪些后端文件
+2. 路由是什么
+3. SQL 的排序和过滤条件是什么
+4. limit 校验怎么做
+5. 用什么方式保证 user_id 隔离
+
+第 2 步：前端 API adapter
+新增前端 API 文件，按 adapter 规范处理：
+- api/ 层定义 raw API 类型，但不要 export 给页面层
+- normalize 函数放在 api 文件内部，不 export
+- 页面和 hook 只消费规范化后的前端类型
+
+要求：
+- 新建 `src/api/recentExperiments.ts`
+- 新建或修改 `src/types/recentExperiment.ts`
+- 前端领域类型尽量只保留用途型字段，不要机械透传原始后端字段
+- 如果首页不需要直接消费 updatedAt，就不要在 RecentExperimentItem 里同时保留 updatedAt 和 effectiveTime 两套时间语义
+
+建议前端类型接近：
+{
+  experimentId: string;
+  experimentTitle: string;
+  sciNoteId: string;
+  sciNoteTitle: string;
+  effectiveTime: string | null;
+  ago: string;
+  experimentStatus?: string;
+}
+
+完成后回复：
+1. 新增/修改了哪些前端类型/API文件
+2. raw API 类型叫什么，是否对外 export
+3. normalize 函数放在哪
+4. RecentExperimentItem 最终字段是什么
+
+第 3 步：首页 recent feed hook
+新增：
+src/hooks/useRecentExperimentFeed.ts
+
+要求：
+- 只负责调用 listRecentExperiments(limit)
+- 管理 loading / error / items
+- 不依赖 SciNoteStoreContext
+- 不把额外业务逻辑塞到 HomePage
+
+完成后回复：
+1. hook 文件路径
+2. 返回了哪些状态
+3. 是否独立于 SciNoteStoreContext
+
+第 4 步：首页 UI 接入
+要求：
+- HomePage 改接 useRecentExperimentFeed(8)
+- RecentNotes 标题改回“最近实验”
+- NoteCard 语义只服务“实验记录卡片”
+- 显示层级：
+  - 主标题：experimentTitle
+  - 次信息：sciNoteTitle
+  - 时间：ago
+- 保留 loading / empty / error 三态
+- 不要让 NoteCard 同时兼容“项目卡片”和“实验卡片”
+
+回退要求：
+- 回退点放在 HomePage 或页面接入层
+- 不要把双语义兼容塞进 NoteCard / RecentNotes
+
+完成后回复：
+1. 改了哪些首页文件
+2. NoteCard 现在只服务哪一种实体
+3. loading / empty / error 三态分别怎么显示
+4. 回退点放在哪一层
+
+第 5 步：首页点击跳转
+要求：
+- 点击卡片跳到：
+  /personal/experiment/:sciNoteId/workbench?experimentId=:experimentId
+- 不要再跳到 SciNote 详情页
+- 保证 URL 参数语义清楚
+
+完成后回复：
+1. 点击逻辑在哪个文件
+2. 最终跳转 URL 模板是什么
+
+第 6 步：workbench 预选 experiment
+这是重点，必须做稳，不接受“先显示第一条再切到目标 experiment”。
+
+要求：
+1. 如果 URL 带 experimentId：
+   - 在 records 加载和目标定位完成前，不要先稳定展示错误记录
+2. records 加载后：
+   - 找到目标 experiment → 直接以目标 experiment 作为首次稳定展示
+   - 找不到 → 再降级到第一条
+3. 尽量基于当前已有状态机制做最小改动
+4. 不要把 AI、report 等不相关逻辑一起改进去
+
+完成后回复：
+1. 改了哪些 workbench 文件
+2. 最小改动落点在哪
+3. 现在如何避免“先显示第一条再切目标条”
+4. experimentId 不存在时怎么兜底
+
+第 7 步：最终验收回复
+全部做完后，统一再回复一次：
+1. 新增了哪些文件
+2. 修改了哪些文件
+3. 首页最近实验的数据流是什么
+4. 点击卡片后的完整跳转链路是什么
+5. workbench 预选的完整判定顺序是什么
+6. 这次是否遵守了 API adapter 规则
+7. 这次是否新增了任何不该进入 WorkbenchContext 的逻辑
+8. 还遗留了哪些后续可优化项，但这次没动
+
+注意
+- 每一步都先做完再汇报，不要整包闷头改
+- 不要自由发挥增加状态徽章、筛选器、菜单等额外功能
+- 这次目标是打通“最近实验 feed”的正式产品闭环
+- 代码必须按可上线产品标准实现，不是 demo
