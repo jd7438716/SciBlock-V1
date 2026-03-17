@@ -10,13 +10,15 @@
  *   - Prev / Next month navigation
  *   - Today highlighted with a ring
  *   - Selected date highlighted in dark
- *   - Coloured dot(s) beneath days that have experiment records
+ *   - One colored dot per distinct status on days that have records
+ *     (state-deduplicated, not one-dot-per-record)
  */
 
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { CalendarRecord, DateRecordMap } from "@/types/calendarPanel";
+import type { DateRecordMap } from "@/types/calendarPanel";
 import { STATUS_DOT_CLASS } from "@/types/calendarPanel";
+import { dayStatusSet } from "@/utils/calendarStats";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,24 +33,13 @@ function toDateStr(d: Date): string {
 
 /** Build the grid cells for a given month. Null = empty leading/trailing cell. */
 function buildCells(year: number, month: number): Array<Date | null> {
-  const firstDay   = new Date(year, month, 1).getDay();       // 0=Sun
+  const firstDay    = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells: Array<Date | null> = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
   while (cells.length % 7 !== 0) cells.push(null);
   return cells;
-}
-
-/** Pick the dominant dot colour from a list of records for one day. */
-function dominantDotClass(records: CalendarRecord[]): string {
-  const order: Array<CalendarRecord["experimentStatus"]> = [
-    "已验证", "可复现", "探索中", "失败",
-  ];
-  for (const s of order) {
-    if (records.some((r) => r.experimentStatus === s)) return STATUS_DOT_CLASS[s];
-  }
-  return "bg-gray-400";
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +68,7 @@ export function CalendarGrid({
   const cells = buildCells(year, month);
 
   const monthLabel = currentMonth.toLocaleDateString("zh-CN", {
-    year: "numeric",
+    year:  "numeric",
     month: "long",
   });
 
@@ -118,11 +109,14 @@ export function CalendarGrid({
         {cells.map((date, idx) => {
           if (!date) return <div key={idx} />;
 
-          const dateStr     = toDateStr(date);
-          const records     = dateMap.get(dateStr);
-          const hasRecords  = !!records?.length;
-          const isToday     = dateStr === TODAY_STR;
-          const isSelected  = dateStr === selectedStr;
+          const dateStr    = toDateStr(date);
+          const records    = dateMap.get(dateStr);
+          const hasRecords = !!records?.length;
+          const isToday    = dateStr === TODAY_STR;
+          const isSelected = dateStr === selectedStr;
+
+          // Unique statuses present this day, in canonical order (max 4).
+          const statuses = hasRecords ? dayStatusSet(records!) : [];
 
           return (
             <button
@@ -137,19 +131,23 @@ export function CalendarGrid({
                   : "text-gray-700 hover:bg-gray-100",
               ].join(" ")}
             >
-              <span>{date.getDate()}</span>
+              <span className={hasRecords ? "mb-1" : undefined}>
+                {date.getDate()}
+              </span>
 
-              {/* Record dot */}
-              {hasRecords && !isSelected && (
-                <span
-                  className={[
-                    "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
-                    dominantDotClass(records!),
-                  ].join(" ")}
-                />
-              )}
-              {hasRecords && isSelected && (
-                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/60" />
+              {/* Multi-status dots — one dot per distinct status, deduped */}
+              {hasRecords && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex items-center gap-0.5">
+                  {statuses.map((s) => (
+                    <span
+                      key={s}
+                      className={[
+                        "w-1 h-1 rounded-full",
+                        isSelected ? "bg-white/60" : STATUS_DOT_CLASS[s],
+                      ].join(" ")}
+                    />
+                  ))}
+                </span>
               )}
             </button>
           );

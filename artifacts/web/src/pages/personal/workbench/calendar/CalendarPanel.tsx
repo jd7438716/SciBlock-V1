@@ -26,9 +26,11 @@ import { RecordDayList } from "./RecordDayList";
 import { RecentRecords } from "./RecentRecords";
 import { STATUS_DOT_CLASS } from "@/types/calendarPanel";
 import type { ExperimentStatus } from "@/types/workbench";
+import { monthStatusCounts } from "@/utils/calendarStats";
 
 // ---------------------------------------------------------------------------
-// Legend
+// Legend — shows each status with a colored dot and the record count for
+// the currently visible calendar month.
 // ---------------------------------------------------------------------------
 
 const LEGEND_ITEMS: Array<{ status: ExperimentStatus; label: string }> = [
@@ -38,13 +40,20 @@ const LEGEND_ITEMS: Array<{ status: ExperimentStatus; label: string }> = [
   { status: "失败",   label: "失败"   },
 ];
 
-function Legend() {
+interface LegendProps {
+  counts: Record<ExperimentStatus, number>;
+}
+
+function Legend({ counts }: LegendProps) {
   return (
     <div className="flex flex-wrap gap-x-3 gap-y-1">
       {LEGEND_ITEMS.map(({ status, label }) => (
         <div key={status} className="flex items-center gap-1">
-          <span className={["w-1.5 h-1.5 rounded-full", STATUS_DOT_CLASS[status]].join(" ")} />
-          <span className="text-[10px] text-gray-500">{label}</span>
+          <span className={["w-1.5 h-1.5 rounded-full flex-shrink-0", STATUS_DOT_CLASS[status]].join(" ")} />
+          <span className="text-[10px] text-gray-500">
+            {label}
+            <span className="text-gray-400 ml-0.5">（{counts[status]}）</span>
+          </span>
         </div>
       ))}
     </div>
@@ -64,6 +73,10 @@ export function CalendarPanel({ isOpen }: Props) {
   const [, navigate] = useLocation();
 
   const state = useCalendarPanel(isOpen, records, currentRecord.sciNoteId);
+
+  // Count per status for all records visible in the current calendar month.
+  // Recomputed whenever the user navigates months or records change.
+  const legendCounts = monthStatusCounts(state.dateMap, state.currentMonth);
 
   // ── Navigation handler ─────────────────────────────────────────────────
   function handleNavigate(sciNoteId: string, recordId: string) {
@@ -112,7 +125,7 @@ export function CalendarPanel({ isOpen }: Props) {
 
         {/* Legend */}
         <div className="border-t border-gray-100 pt-3">
-          <Legend />
+          <Legend counts={legendCounts} />
         </div>
 
         {/* Content: day list or recent list */}
