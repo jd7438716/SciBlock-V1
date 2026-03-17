@@ -82,6 +82,13 @@ export default defineConfig({
       strict: true,
       deny: ["**/.*"],
     },
+    // 开发时代理 API 请求到本地 Docker 中的 api-server
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     port,

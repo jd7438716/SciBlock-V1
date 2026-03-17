@@ -114,31 +114,17 @@ services:
       dockerfile: artifacts/web/Dockerfile.web
     restart: unless-stopped
     depends_on:
-      - api-server
-    environment:
-      PORT: 22333
-      BASE_PATH: ${BASE_PATH:-/}
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-    ports:
-      - "22333:22333"
-    networks:
-      - sciblock-network
-    # 生产静态文件由 Nginx 提供，因此此服务仅用于开发；生产部署时注释掉
-
-  nginx:
-    image: nginx:alpine
-    restart: unless-stopped
-    depends_on:
-      web:
-        condition: service_started
       api-server:
         condition: service_healthy
     ports:
       - "80:80"
-    volumes:
-      - ./deploy/nginx.docker.conf:/etc/nginx/nginx.conf:ro
     networks:
       - sciblock-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
