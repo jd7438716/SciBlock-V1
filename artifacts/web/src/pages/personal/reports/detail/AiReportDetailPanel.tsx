@@ -256,7 +256,7 @@ function ProvenanceCard({ experiments }: { experiments: AiReportContent["provena
           {experiments.map((e) => (
             <button
               key={e.id}
-              onClick={() => navigate(`/personal/experiment/${e.id}/workbench`)}
+              onClick={() => navigate(`/personal/experiment/${e.sciNoteId}/workbench?experimentId=${e.id}`)}
               className="flex items-center gap-3 py-2.5 text-left group hover:bg-gray-50 -mx-1 px-1 rounded-lg transition-colors"
             >
               <div className="flex-1 min-w-0">
