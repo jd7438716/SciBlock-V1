@@ -37,6 +37,7 @@ import type {
   DataItem,
   Tag,
 } from "@/types/ontologyModules";
+import { AttachmentViewStrip } from "@/pages/personal/workbench/modules/shared/AttachmentViewStrip";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -99,6 +100,7 @@ function SystemObjectRow({ obj }: { obj: SystemObject }) {
         <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{obj.description}</p>
       )}
       <TagPills tags={obj.attributes ?? []} />
+      <AttachmentViewStrip attachments={obj.attachments ?? []} />
     </div>
   );
 }
@@ -116,6 +118,7 @@ function PrepItemRow({ item }: { item: PrepItem }) {
         <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{item.description}</p>
       )}
       <TagPills tags={item.attributes ?? []} />
+      <AttachmentViewStrip attachments={item.attachments ?? []} />
     </div>
   );
 }
@@ -132,6 +135,7 @@ function OperationStepRow({ step }: { step: OperationStep }) {
           <p className="mt-1 text-xs text-gray-500 leading-relaxed">{step.notes}</p>
         )}
         <TagPills tags={step.params ?? []} />
+        <AttachmentViewStrip attachments={step.attachments ?? []} />
       </div>
     </div>
   );
@@ -159,6 +163,7 @@ function MeasurementItemRow({ item }: { item: MeasurementItem }) {
         </p>
       )}
       <TagPills tags={item.conditions ?? []} />
+      <AttachmentViewStrip attachments={item.attachments ?? []} />
     </div>
   );
 }
@@ -171,6 +176,7 @@ function DataItemRow({ item }: { item: DataItem }) {
         <p className="mt-1 text-xs text-gray-500 leading-relaxed">{item.description}</p>
       )}
       <TagPills tags={item.attributes ?? []} />
+      <AttachmentViewStrip attachments={item.attachments ?? []} />
     </div>
   );
 }
