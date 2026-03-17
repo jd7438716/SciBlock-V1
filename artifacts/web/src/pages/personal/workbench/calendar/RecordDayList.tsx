@@ -10,7 +10,7 @@ import React from "react";
 import { FlaskConical } from "lucide-react";
 import type { CalendarRecord } from "@/types/calendarPanel";
 import { STATUS_DOT_CLASS, STATUS_BG_CLASS, STATUS_TEXT_CLASS } from "@/types/calendarPanel";
-import { formatDateLabel } from "@/api/calendarRecords";
+import { formatDateLabel } from "@/utils/calendarRecords";
 
 interface Props {
   dateStr:         string;

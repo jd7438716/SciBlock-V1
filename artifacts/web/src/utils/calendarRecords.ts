@@ -1,7 +1,7 @@
 /**
  * calendarRecords.ts — data transformation helpers for the calendar panel.
  *
- * Layer: Pure utilities (no React, no context, no storage access).
+ * Layer: Pure utilities (no React, no context, no storage access, no HTTP calls).
  *
  * Builds an in-memory date index from ExperimentRecord[] provided by
  * WorkbenchContext. The records are the authoritative in-memory data source;

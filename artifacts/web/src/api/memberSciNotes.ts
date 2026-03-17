@@ -19,12 +19,12 @@
 
 import type { SciNote } from "@/types/scinote";
 import type { WizardFormData } from "@/types/wizardForm";
-import type { ExperimentRecord } from "@/types/workbench";
+import type { ExperimentRecord, OntologyModule } from "@/types/workbench";
 import { apiFetch } from "./client";
-import { apiResponseToRecord, type ExperimentApiResponse } from "./experiments";
+import { apiResponseToRecord } from "./experiments";
 
 // ---------------------------------------------------------------------------
-// Wire types — internal only
+// Wire types — internal only (never exported)
 // ---------------------------------------------------------------------------
 
 interface ApiMemberSciNote {
@@ -39,13 +39,35 @@ interface ApiMemberSciNote {
   updatedAt:      string;
 }
 
+/**
+ * Wire shape for a single experiment record returned by instructor endpoints.
+ * Mirrors the shape in api/experiments.ts but is intentionally local so that
+ * the wire type never leaks beyond this adapter file.
+ */
+interface MemberExperimentApiResponse {
+  id:                 string;
+  sciNoteId:          string;
+  title:              string;
+  purposeInput:       string | null;
+  experimentStatus:   string;
+  experimentCode:     string;
+  tags:               string[];
+  editorContent:      string;
+  reportHtml:         string | null;
+  currentModules:     OntologyModule[] | null;
+  inheritedVersionId: string | null;
+  isDeleted:          boolean;
+  createdAt:          string;
+  updatedAt:          string;
+}
+
 interface ListMemberSciNotesResponse {
   items: ApiMemberSciNote[];
   total: number;
 }
 
 interface ListMemberExperimentsResponse {
-  items: ExperimentApiResponse[];
+  items: MemberExperimentApiResponse[];
   total: number;
 }
 
@@ -111,7 +133,7 @@ export async function fetchMemberExperiment(
   userId:       string,
   experimentId: string,
 ): Promise<ExperimentRecord> {
-  const res = await apiFetch<ExperimentApiResponse>(
+  const res = await apiFetch<MemberExperimentApiResponse>(
     `/instructor/members/${encodeURIComponent(userId)}/experiments/${encodeURIComponent(experimentId)}`,
   );
   return apiResponseToRecord(res);

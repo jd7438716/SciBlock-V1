@@ -17,7 +17,7 @@ import { useState, useMemo, useCallback } from "react";
 import {
   buildCalendarRecordMap,
   getRecentDays,
-} from "@/api/calendarRecords";
+} from "@/utils/calendarRecords";
 import type { CalendarRecord, DateRecordMap } from "@/types/calendarPanel";
 import type { ExperimentRecord } from "@/types/workbench";
 

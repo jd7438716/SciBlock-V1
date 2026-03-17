@@ -6,10 +6,11 @@ import type {
 } from "@/types/workbench";
 
 // ---------------------------------------------------------------------------
-// Wire types (Go API shapes)
+// Wire types (Go API shapes) — internal to this adapter.
+// Do not export these — callers receive ExperimentRecord (domain type) only.
 // ---------------------------------------------------------------------------
 
-export interface ExperimentApiResponse {
+interface ExperimentApiResponse {
   id: string;
   sciNoteId: string;
   title: string;
