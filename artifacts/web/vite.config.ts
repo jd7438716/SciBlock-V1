@@ -68,6 +68,41 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // node_modules 按包名分包
+          if (id.includes('node_modules')) {
+            // React 生态
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            // Radix UI 组件
+            if (id.includes('@radix-ui')) {
+              return 'vendor-radix';
+            }
+            // 编辑器
+            if (id.includes('@tiptap')) {
+              return 'vendor-editor';
+            }
+            // 图表
+            if (id.includes('recharts')) {
+              return 'vendor-chart';
+            }
+            // 表单
+            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
+              return 'vendor-form';
+            }
+            // 工具库
+            if (id.includes('date-fns') || id.includes('framer-motion') || id.includes('lucide')) {
+              return 'vendor-utils';
+            }
+            // 其他第三方库
+            return 'vendor';
+          }
+        },
+      },
+    },
   },
   server: {
     port,
