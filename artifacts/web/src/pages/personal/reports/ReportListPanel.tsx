@@ -2,7 +2,19 @@ import React from "react";
 import { Sparkles } from "lucide-react";
 import { ReportStatusTag } from "@/components/reports/ReportStatusTag";
 import type { WeeklyReport } from "@/types/weeklyReport";
-import { fmtDate, isAiGenerated } from "@/types/weeklyReport";
+import { fmtDate, fmtWeekLabel, isAiGenerated } from "@/types/weeklyReport";
+
+/** Format a datetime string to a compact locale string (no year). */
+function fmtTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return d.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 interface Props {
   reports: WeeklyReport[];
@@ -59,10 +71,11 @@ export function ReportListPanel({ reports, selectedId, onSelect, onAiGenerate, l
                     active ? "bg-blue-50" : "hover:bg-gray-50",
                   ].join(" ")}
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  {/* Row 1: week label + status tag */}
+                  <div className="flex items-center justify-between mb-0.5">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-xs text-gray-500">
-                        {fmtDate(r.weekStart)} – {r.weekEnd ? fmtDate(r.weekEnd) : "?"}
+                      <span className="text-xs font-medium text-gray-600">
+                        {fmtWeekLabel(r.weekStart)}
                       </span>
                       {aiGen && (
                         <Sparkles size={10} className="text-violet-400 flex-shrink-0" />
@@ -70,9 +83,25 @@ export function ReportListPanel({ reports, selectedId, onSelect, onAiGenerate, l
                     </div>
                     <ReportStatusTag status={r.status} />
                   </div>
+                  {/* Row 2: date range */}
+                  <p className="text-xs text-gray-400 mb-1">
+                    {fmtDate(r.weekStart)} – {r.weekEnd ? fmtDate(r.weekEnd) : "?"}
+                  </p>
+                  {/* Row 3: title */}
                   <p className={`text-sm truncate ${active ? "text-blue-900 font-medium" : "text-gray-800"}`}>
                     {r.title}
                   </p>
+                  {/* Row 4: submitted/updated time */}
+                  {(() => {
+                    const timeLabel = r.submittedAt
+                      ? `提交 ${fmtTime(r.submittedAt)}`
+                      : r.updatedAt
+                      ? `更新 ${fmtTime(r.updatedAt)}`
+                      : null;
+                    return timeLabel ? (
+                      <p className="text-xs text-gray-400 mt-0.5">{timeLabel}</p>
+                    ) : null;
+                  })()}
                 </button>
               );
             })}

@@ -22,7 +22,7 @@ import {
 import { CommentThread } from "@/components/reports/CommentThread";
 import { ReportStatusTag } from "@/components/reports/ReportStatusTag";
 import type { WeeklyReport, AiReportContent } from "@/types/weeklyReport";
-import { parseAiContent, EXP_STATUS_COLORS, fmtDate } from "@/types/weeklyReport";
+import { parseAiContent, EXP_STATUS_COLORS, fmtDate, fmtWeekLabel, fmtWeekRange } from "@/types/weeklyReport";
 
 // ---------------------------------------------------------------------------
 // Section card container
@@ -325,6 +325,14 @@ function SubmitAction({
     report.status === "under_review" ||
     report.status === "reviewed";
 
+  // Build a human-readable week label so students always know which week
+  // they are about to submit.
+  const weekLabel = fmtWeekLabel(report.weekStart);
+  const weekRange = fmtWeekRange(
+    report.dateRangeStart ?? report.weekStart,
+    report.dateRangeEnd ?? report.weekEnd,
+  );
+
   const handleSubmit = async () => {
     setSubmitting(true);
     setErrorMsg(null);
@@ -346,11 +354,12 @@ function SubmitAction({
         <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
         <div>
           <p className="text-sm font-medium text-green-800">已提交给导师</p>
-          {report.submittedAt && (
-            <p className="text-xs text-green-600 mt-0.5">
-              提交时间：{new Date(report.submittedAt).toLocaleString("zh-CN")}
-            </p>
-          )}
+          <p className="text-xs text-green-600 mt-0.5">
+            {weekLabel}（{weekRange}）
+            {report.submittedAt
+              ? `· 提交于 ${new Date(report.submittedAt).toLocaleString("zh-CN")}`
+              : ""}
+          </p>
         </div>
       </div>
     );
@@ -378,11 +387,10 @@ function SubmitAction({
           <p className={`text-sm font-medium ${isRevision ? "text-red-800" : "text-gray-700"}`}>
             {isRevision ? "导师要求修改，请修改后重新提交" : "汇总已完成，可以提交给导师了"}
           </p>
-          {!isRevision && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              提交后导师即可查看这份汇总报告
-            </p>
-          )}
+          {/* Explicit week label so student always knows which week they're submitting */}
+          <p className={`text-xs mt-0.5 ${isRevision ? "text-red-600" : "text-gray-500"}`}>
+            将提交周报：<span className="font-medium">{weekLabel}</span>（{weekRange}）
+          </p>
           {errorMsg && (
             <p className="text-xs text-red-600 mt-1.5">{errorMsg}</p>
           )}

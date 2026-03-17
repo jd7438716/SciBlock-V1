@@ -6,7 +6,7 @@ import { CommentThread } from "@/components/reports/CommentThread";
 import { useCurrentUser } from "@/contexts/UserContext";
 import type { StudentWithReport } from "@/hooks/reports/useTeamReports";
 import type { WeeklyReportStatus, AddWeeklyReportCommentPayload } from "@/types/weeklyReport";
-import { parseReportContent, parseAiContent, fmtWeekRange } from "@/types/weeklyReport";
+import { parseReportContent, parseAiContent, fmtWeekRange, fmtWeekLabel } from "@/types/weeklyReport";
 
 const STATUS_ACTIONS: Array<{ status: WeeklyReportStatus; label: string; cls: string }> = [
   { status: "under_review",   label: "标记为审阅中", cls: "border-yellow-300 text-yellow-700 hover:bg-yellow-50" },
@@ -44,11 +44,24 @@ export function TeamReportDetailPanel({ selected, weekStart, weekEnd, onChangeSt
   const { report } = selected;
 
   if (!report) {
+    const last = selected.lastSubmission;
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-sm text-gray-500 font-medium">{selected.name} 本周尚未提交周报</p>
-          <p className="text-xs text-gray-400 mt-1">{fmtWeekRange(weekStart, weekEnd)}</p>
+      <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
+        <div className="text-center max-w-sm">
+          <p className="text-sm text-gray-500 font-medium">
+            {selected.name} 本周（{fmtWeekRange(weekStart, weekEnd)}）尚未提交周报
+          </p>
+          {last ? (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+              <span className="text-xs text-amber-700">
+                最近一次提交：
+                <span className="font-medium">{fmtWeekLabel(last.weekStart)}</span>
+                {last.weekEnd ? `（${fmtWeekRange(last.weekStart, last.weekEnd)}）` : ""}
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 mt-1">该同学尚无任何已提交的周报</p>
+          )}
         </div>
       </div>
     );

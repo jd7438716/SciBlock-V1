@@ -7,7 +7,7 @@
 
 import { db } from "@workspace/db";
 import { weeklyReportsTable } from "@workspace/db/schema";
-import { eq, ne, and, desc } from "drizzle-orm";
+import { eq, ne, and, desc, sql } from "drizzle-orm";
 
 export type ReportRow = typeof weeklyReportsTable.$inferSelect;
 
@@ -31,6 +31,24 @@ export async function markReportSubmitted(id: string): Promise<ReportRow | null>
     .where(eq(weeklyReportsTable.id, id))
     .returning();
   return row ?? null;
+}
+
+/**
+ * Returns each student's most recently submitted (non-draft) report,
+ * regardless of week. Used by the instructor team view to show "last
+ * submission" context when no report exists for the currently selected week.
+ *
+ * DISTINCT ON (student_id) ORDER BY submitted_at DESC gives one row per
+ * student — their latest non-draft report.
+ */
+export async function findLastSubmissionPerStudent(): Promise<ReportRow[]> {
+  const rows = await db.execute<ReportRow>(sql`
+    SELECT DISTINCT ON (student_id) *
+    FROM weekly_reports
+    WHERE status != 'draft'
+    ORDER BY student_id, submitted_at DESC NULLS LAST, updated_at DESC
+  `);
+  return rows.rows as ReportRow[];
 }
 
 /**

@@ -1,7 +1,8 @@
 import React from "react";
-import { CheckCircle, AlertCircle, Clock, XCircle } from "lucide-react";
+import { CheckCircle, AlertCircle, Clock, XCircle, History } from "lucide-react";
 import type { StudentWithReport } from "@/hooks/reports/useTeamReports";
 import type { WeeklyReportStatus } from "@/types/weeklyReport";
+import { fmtWeekLabel } from "@/types/weeklyReport";
 
 interface Props {
   students: StudentWithReport[];
@@ -87,9 +88,17 @@ export function TeamReportListPanel({ students, selectedStudentId, onSelect, loa
                   </span>
                   <StatusDot status={reportStatus} />
                 </div>
-                <p className="text-xs text-gray-400 truncate mt-0.5">
-                  {DEGREE_LABEL[s.degree] ?? s.degree}·{s.researchTopic.slice(0, 8)}
-                </p>
+                {/* Second row: degree + topic, or last-submission hint if no current-week report */}
+                {!s.report && s.lastSubmission ? (
+                  <p className="text-xs text-amber-600 truncate mt-0.5 flex items-center gap-1">
+                    <History size={10} className="flex-shrink-0" />
+                    最近：{fmtWeekLabel(s.lastSubmission.weekStart)}
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 truncate mt-0.5">
+                    {DEGREE_LABEL[s.degree] ?? s.degree}·{s.researchTopic.slice(0, 8)}
+                  </p>
+                )}
               </div>
             </button>
           );

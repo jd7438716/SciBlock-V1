@@ -16,7 +16,7 @@ import { ReportContentForm } from "@/components/reports/ReportContentForm";
 import { ReportContentView } from "@/components/reports/ReportContentView";
 import { CommentThread } from "@/components/reports/CommentThread";
 import type { WeeklyReport, WeeklyReportContent } from "@/types/weeklyReport";
-import { EMPTY_REPORT_CONTENT, parseReportContent, fmtWeekRange } from "@/types/weeklyReport";
+import { EMPTY_REPORT_CONTENT, parseReportContent, fmtWeekRange, fmtWeekLabel } from "@/types/weeklyReport";
 
 interface Props {
   report: WeeklyReport | null;
@@ -142,29 +142,38 @@ export function ReportWorkPanel({
 
         {/* Actions */}
         {isEditable && (
-          <div className="flex items-center gap-3 mb-6">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              保存草稿
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={saving}
-              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
-            >
-              提交周报
-            </button>
-            <button
-              onClick={handleDelete}
-              className="ml-auto px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
-            >
-              删除
-            </button>
+          <div className="mb-6">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                保存草稿
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
+              >
+                提交周报
+              </button>
+              <button
+                onClick={handleDelete}
+                className="ml-auto px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                删除
+              </button>
+            </div>
+            {/* Week context — prevents student from inadvertently submitting wrong week */}
+            <p className="text-xs text-gray-400 mt-1.5">
+              将提交：<span className="font-medium text-gray-600">{fmtWeekLabel(report.weekStart)}</span>
+              （{fmtWeekRange(report.weekStart, report.weekEnd)}）周报
+            </p>
             {message && (
-              <span className="text-sm text-gray-500">{message}</span>
+              <p className={`text-sm mt-1.5 ${message.includes("失败") ? "text-red-500" : "text-gray-500"}`}>
+                {message}
+              </p>
             )}
           </div>
         )}

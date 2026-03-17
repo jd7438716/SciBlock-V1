@@ -28,7 +28,7 @@ import { eq, desc } from "drizzle-orm";
 import { requireInstructor } from "../middleware/requireAuth";
 import { getStudentByUserId } from "../services/student.service";
 import { submitReport } from "../services/report.service";
-import { findSubmittedReportsForTeam } from "../repositories/report.repository";
+import { findSubmittedReportsForTeam, findLastSubmissionPerStudent } from "../repositories/report.repository";
 
 const router = Router();
 
@@ -375,9 +375,12 @@ router.get("/", async (req, res) => {
 router.get("/team", requireInstructor, async (req, res) => {
   const { weekStart } = req.query as { weekStart?: string };
   try {
-    const students = await db.select().from(studentsTable).orderBy(studentsTable.name);
-    const reports = await findSubmittedReportsForTeam(weekStart);
-    res.json({ students, reports });
+    const [students, reports, lastSubmissions] = await Promise.all([
+      db.select().from(studentsTable).orderBy(studentsTable.name),
+      findSubmittedReportsForTeam(weekStart),
+      findLastSubmissionPerStudent(),
+    ]);
+    res.json({ students, reports, lastSubmissions });
   } catch (err) {
     console.error("[reports] GET /team error:", err);
     res.status(500).json({ message: "Failed to fetch team reports" });

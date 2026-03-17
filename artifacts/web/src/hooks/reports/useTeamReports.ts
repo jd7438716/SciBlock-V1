@@ -11,7 +11,14 @@ export interface StudentWithReport {
   degree: string;
   researchTopic: string;
   avatar: string | null;
+  /** Submitted report for the currently selected week, null if none. */
   report: WeeklyReport | null;
+  /**
+   * The student's most recently submitted report across all weeks.
+   * Used to show instructors "last submitted on week X" when no report
+   * exists for the currently selected week.
+   */
+  lastSubmission: WeeklyReport | null;
 }
 
 interface UseTeamReportsReturn {
@@ -83,7 +90,9 @@ export function useTeamReports(): UseTeamReportsReturn {
       data?.reports.find(
         (r) => r.studentId === s.id && r.weekStart === weekStart,
       ) ?? null;
-    return { ...s, report };
+    const lastSubmission =
+      data?.lastSubmissions?.find((r) => r.studentId === s.id) ?? null;
+    return { ...s, report, lastSubmission };
   });
 
   const changeStatus = useCallback(

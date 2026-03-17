@@ -83,7 +83,14 @@ export interface TeamReportsResponse {
     researchTopic: string;
     avatar: string | null;
   }>;
+  /** Submitted reports for the queried week only (no drafts). */
   reports: WeeklyReport[];
+  /**
+   * Each student's most recently submitted report across ALL weeks.
+   * Used by the instructor view to show "last submission" context
+   * when a student has no report for the currently selected week.
+   */
+  lastSubmissions: WeeklyReport[];
 }
 
 export function fetchTeamReports(weekStart?: string): Promise<TeamReportsResponse> {
