@@ -3,24 +3,29 @@
  *
  * Layout（两种模式）：
  *
- *   单栏模式（默认，未选中项目时）:
+ *   单栏模式（默认）:
  *     面包屑
  *     单列内容区（max-w-2xl，居中滚动）
  *
- *   双栏模式（选中某个 SciNote 项目后）：
+ *   双栏模式（选中 SciNote 项目 或 周报 后）：
  *     面包屑（全宽）
- *     ┌──────────────────────┬──────────────────┐
- *     │ 左栏：成员详情内容    │ 右栏：项目实验   │
- *     │ （独立滚动）          │ 记录面板         │
- *     │                      │ （独立滚动）      │
- *     └──────────────────────┴──────────────────┘
+ *     ┌──────────────────────┬──────────────────────┐
+ *     │ 左栏：成员详情内容    │ 右栏：                │
+ *     │ （独立滚动）          │  - 实验记录面板 或    │
+ *     │                      │  - 周报详情面板        │
+ *     │                      │ （独立滚动）           │
+ *     └──────────────────────┴──────────────────────┘
+ *
+ * 右栏互斥规则：
+ *   - 选中 SciNote 时自动关闭周报详情
+ *   - 选中周报时自动关闭 SciNote 实验记录
+ *   - 两者同时最多有一个处于选中状态
  *
  * 数据语义：
- *   - useMemberSciNotes(student.userId) — 被查看成员自己的 SciNotes
- *   - useMemberSciNoteExperiments — 被查看成员在某项目下的实验记录
- *   - 以上两个 hook 均调用 Go API 的 instructor-only 端点
- *   - student.userId（auth user ID）用于 Go API 查询；
- *     student.id（profile ID）用于 Express team API 查询
+ *   - useMemberSciNotes(student.userId) — 被查看成员自己的 SciNotes (Go API, instructor-only)
+ *   - useStudentReports(student.id)     — 被查看成员的已提交周报  (Express API, instructor-only)
+ *   - student.userId（auth user ID）用于 Go API 查询
+ *   - student.id（profile ID）用于 Express team API 查询
  *
  * Layer: page
  */
@@ -31,17 +36,20 @@ import {
   BookOpen, FileText, FlaskConical, ScrollText,
   GraduationCap, ChevronLeft, Lock,
 } from "lucide-react";
-import { useStudentDetail }              from "../../hooks/team/useStudentDetail";
-import { useMemberSciNotes }             from "../../hooks/team/useMemberSciNotes";
-import { useCurrentUser }                from "../../contexts/UserContext";
-import { ProfileCard }                   from "./detail/ProfileCard";
-import { SectionHeading }                from "../../components/team/SectionHeading";
-import BasicInfoCard                     from "./detail/BasicInfoCard";
-import PapersCard                        from "./detail/PapersCard";
-import ExperimentRecordsCard             from "./detail/ExperimentRecordsCard";
-import WeeklyReportsCard                 from "./detail/WeeklyReportsCard";
-import { MemberSciNoteExperimentsPanel } from "./detail/MemberSciNoteExperimentsPanel";
-import type { SciNote }                  from "../../types/scinote";
+import { useStudentDetail }                from "../../hooks/team/useStudentDetail";
+import { useMemberSciNotes }              from "../../hooks/team/useMemberSciNotes";
+import { useCurrentUser }                 from "../../contexts/UserContext";
+import { ProfileCard }                    from "./detail/ProfileCard";
+import { SectionHeading }                 from "../../components/team/SectionHeading";
+import BasicInfoCard                      from "./detail/BasicInfoCard";
+import PapersCard                         from "./detail/PapersCard";
+import ExperimentRecordsCard              from "./detail/ExperimentRecordsCard";
+import WeeklyReportsCard                  from "./detail/WeeklyReportsCard";
+import { StudentReportsCard }             from "./detail/StudentReportsCard";
+import { MemberSciNoteExperimentsPanel }  from "./detail/MemberSciNoteExperimentsPanel";
+import { MemberReportDetailPanel }        from "./detail/MemberReportDetailPanel";
+import type { SciNote }                   from "../../types/scinote";
+import type { WeeklyReport }              from "../../types/weeklyReport";
 
 export default function MemberDetailPage() {
   const { id }       = useParams<{ id: string }>();
@@ -54,12 +62,10 @@ export default function MemberDetailPage() {
 
   // canEdit: instructor can edit any profile; a student can only edit their own.
   // isOwnProfile relies on student.userId (auth user ID) matching currentUser.id.
-  // If student is not yet loaded, we default to false (deny-until-known).
   const isOwnProfile = !!student?.userId && student.userId === currentUser?.id;
   const canEdit      = isInstructor || isOwnProfile;
 
   // Only fetch member's SciNotes when the current user is an instructor.
-  // Passing null skips the request entirely — useMemberSciNotes has a null guard.
   const memberUserId = student?.userId ?? null;
   const { notes, loading: notesLoading, error: notesError } = useMemberSciNotes(
     isInstructor ? memberUserId : null,
@@ -67,11 +73,21 @@ export default function MemberDetailPage() {
 
   const [paperCount,      setPaperCount]      = useState(0);
   const [reportCount,     setReportCount]      = useState(0);
-  const [selectedSciNote, setSelectedSciNote] = useState<SciNote | null>(null);
+  const [selectedSciNote, setSelectedSciNote]  = useState<SciNote | null>(null);
+  const [selectedReport,  setSelectedReport]   = useState<WeeklyReport | null>(null);
 
-  // Toggle: clicking the same project deselects it
+  // ── Selection handlers (mutually exclusive right panel) ─────────────────
+
   function handleSelectSciNote(note: SciNote) {
     setSelectedSciNote((prev) => (prev?.id === note.id ? null : note));
+    // Deselect report whenever a SciNote is selected
+    setSelectedReport(null);
+  }
+
+  function handleSelectReport(report: WeeklyReport | null) {
+    setSelectedReport(report);
+    // Deselect SciNote whenever a report is selected
+    if (report) setSelectedSciNote(null);
   }
 
   // ── Loading / error states ──────────────────────────────────────────────
@@ -101,7 +117,7 @@ export default function MemberDetailPage() {
     );
   }
 
-  const isDrilling = !!selectedSciNote;
+  const isDrilling = !!selectedSciNote || !!selectedReport;
 
   // ── Detail content (shared between single/dual column) ─────────────────
   const detailContent = (
@@ -157,7 +173,28 @@ export default function MemberDetailPage() {
 
       <section>
         <SectionHeading icon={<ScrollText size={12} />} title="周报" count={reportCount} />
-        <WeeklyReportsCard studentId={student.id} onCountChange={setReportCount} canEdit={canEdit} />
+        {isInstructor ? (
+          // Instructor view: read-only, selectable, full WeeklyReport type
+          <StudentReportsCard
+            studentId={student.id}
+            selectedReportId={selectedReport?.id ?? null}
+            onSelectReport={handleSelectReport}
+            onCountChange={setReportCount}
+          />
+        ) : isOwnProfile ? (
+          // Student self-view: editable, submit-capable
+          <WeeklyReportsCard
+            studentId={student.id}
+            onCountChange={setReportCount}
+            canEdit={canEdit}
+          />
+        ) : (
+          // Student viewing another student's profile (edge case — not exposed in current nav)
+          <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-gray-50 border border-dashed border-gray-200 text-gray-400">
+            <Lock size={13} className="flex-shrink-0" />
+            <span className="text-xs">仅导师可查看成员周报</span>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -199,14 +236,22 @@ export default function MemberDetailPage() {
             {detailContent}
           </div>
 
-          {/* 右栏：实验记录面板（固定宽度，独立滚动） */}
+          {/* 右栏：SciNote 实验记录 或 周报详情（固定宽度，独立滚动） */}
           <div className="w-[400px] flex-shrink-0 flex flex-col overflow-hidden bg-white">
-            <MemberSciNoteExperimentsPanel
-              sciNote={selectedSciNote}
-              memberUserId={memberUserId}
-              memberId={id ?? ""}
-              onClose={() => setSelectedSciNote(null)}
-            />
+            {selectedSciNote && (
+              <MemberSciNoteExperimentsPanel
+                sciNote={selectedSciNote}
+                memberUserId={memberUserId}
+                memberId={id ?? ""}
+                onClose={() => setSelectedSciNote(null)}
+              />
+            )}
+            {selectedReport && (
+              <MemberReportDetailPanel
+                report={selectedReport}
+                onClose={() => setSelectedReport(null)}
+              />
+            )}
           </div>
 
         </div>

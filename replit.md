@@ -6,7 +6,7 @@ Key capabilities:
 - User authentication and role-based access control (student / instructor).
 - Creation and management of "SciNotes" (experiment notebooks) via a 6-step wizard.
 - A 3-panel experiment workbench (Ontology, Editor, Utility) with TipTap rich-text, module-level editing, and AI report generation.
-- Team member management: invite students, student card grid, per-student detail tabs.
+- Team member management: invite students, student card grid, per-student detail page with dual-column layout (SciNote experiments OR weekly report detail in right panel).
 - Messaging inbox: invitation, comment, and share-request notifications.
 - Weekly report system: student creation/submission + AI auto-summary (自动汇总) with 3-step wizard; instructor review workflow with atomic status update (POST /reports/:id/review) and automatic message notifications to students (types: report_reviewed, report_needs_revision, report_comment).
 - AI Weekly Report module: rule-based experiment aggregation (no LLM marketing language), structured AiReportContent with statusDistribution, projectSummary, operationSummary, resultsTrends, parameterChanges, provenanceExperiments sections.
@@ -32,6 +32,11 @@ The project is a pnpm monorepo with `artifacts/` (deployable services) and `lib/
   - `components/reports/AiReportSections.tsx` — pure presentation: SectionCard, SummaryCard, StatusCard, ProjectSummaryCard, OperationCard, TrendsCard, ParamCard, ProvenanceCard (no data fetching)
   - `components/reports/ReportSubmitAction.tsx` — submit/status banner (draft→submit, needs_revision→resubmit, submitted→confirmation)
   - `pages/personal/reports/detail/AiReportDetailPanel.tsx` — thin layout + orchestration; imports from above two files
+- **Member detail page dual-column pattern** (`pages/team/MemberDetailPage.tsx`):
+  - Right panel slot is mutually exclusive: either SciNote experiments OR weekly report detail, never both
+  - `ExperimentRecordsCard` + `MemberSciNoteExperimentsPanel` — instructor view of member's experiments (Go API, 2-level: SciNote → experiment list)
+  - `StudentReportsCard` + `MemberReportDetailPanel` — instructor view of member's weekly reports (Express API, 1-level: report → detail+comments); uses `useStudentReports` hook (GET /api/reports?studentId=:id), filters out drafts
+  - `WeeklyReportsCard` — student's own editable view (uses `useWeeklyReports` hook, GET /team/members/:id/reports)
 - **Auth**: JWT stored in `localStorage["sciblock:token"]`; injected as `Authorization: Bearer <token>` on every API call
 - **Base path**: `BASE_PATH` env var (defaults to `/`); injected by Replit at runtime
 - **Port**: `PORT` env var (default 22333)
