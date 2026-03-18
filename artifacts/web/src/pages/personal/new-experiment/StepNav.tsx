@@ -13,6 +13,8 @@ interface Props {
   aiStatuses?: StepAiStatusMap;
   /** Label for the finish button. Defaults to "开始记录实验". */
   finishLabel?: string;
+  /** When true, the finish button shows a spinner and is disabled (prevents double-submit). */
+  submitting?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +117,9 @@ export function StepNav({
   onFinish,
   aiStatuses,
   finishLabel = "开始记录实验",
+  submitting = false,
 }: Props) {
+  const isDisabled = !canFinish || submitting;
   return (
     <div className="flex flex-col h-full">
       <nav className="flex-1 flex flex-col gap-1 overflow-y-auto">
@@ -133,15 +137,16 @@ export function StepNav({
       <div className="mt-6 pt-4 border-t border-gray-100">
         <p className="text-xs text-gray-400 mb-3 px-1">实验初始化完毕后即可开始记录</p>
         <button
-          disabled={!canFinish}
+          disabled={isDisabled}
           onClick={onFinish}
           className={[
-            "w-full py-2 rounded-lg text-sm font-medium transition-colors",
-            canFinish
+            "w-full py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2",
+            !isDisabled
               ? "bg-gray-900 text-white hover:bg-gray-800"
               : "bg-gray-100 text-gray-400 cursor-not-allowed",
           ].join(" ")}
         >
+          {submitting && <Loader2 size={14} className="animate-spin" />}
           {finishLabel}
         </button>
       </div>

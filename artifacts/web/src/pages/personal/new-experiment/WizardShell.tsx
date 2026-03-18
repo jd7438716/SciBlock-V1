@@ -15,6 +15,8 @@ interface Props {
   /** Finish-button label. Defaults to StepNav's own default ("开始记录实验"). */
   finishLabel?: string;
   onFinish: () => void;
+  /** When true, finish button shows spinner and is disabled (prevents double-submit). */
+  submitting?: boolean;
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * Layout:
  *   [left aside: navHeader + StepNav] | [right main: step content + footer]
  */
-export function WizardShell({ wizard, navHeader, finishLabel, onFinish }: Props) {
+export function WizardShell({ wizard, navHeader, finishLabel, onFinish, submitting }: Props) {
   const { activeStepId, aiAnalysis, form, goToStep } = wizard;
 
   return (
@@ -39,6 +41,7 @@ export function WizardShell({ wizard, navHeader, finishLabel, onFinish }: Props)
           onFinish={onFinish}
           aiStatuses={aiAnalysis.statuses}
           finishLabel={finishLabel}
+          submitting={submitting}
         />
       </aside>
 

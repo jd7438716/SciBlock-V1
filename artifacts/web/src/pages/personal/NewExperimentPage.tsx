@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useExperimentWizard } from "@/hooks/useExperimentWizard";
 import { useNewExperimentDraft } from "@/contexts/NewExperimentDraftContext";
@@ -17,6 +17,8 @@ export function NewExperimentPage() {
   const [, navigate] = useLocation();
   const { createSciNote } = useSciNoteStore();
   const { setDraftName } = useNewExperimentDraft();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const wizard = useExperimentWizard();
 
@@ -32,8 +34,16 @@ export function NewExperimentPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleFinish() {
-    const id = await createSciNote(wizard.form.data);
-    navigate(`/personal/experiment/${id}/workbench`);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const id = await createSciNote(wizard.form.data);
+      navigate(`/personal/experiment/${id}/workbench`);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "创建实验失败，请重试");
+      setIsSubmitting(false);
+    }
   }
 
   const navHeader = (
@@ -43,10 +53,18 @@ export function NewExperimentPage() {
   );
 
   return (
-    <WizardShell
-      wizard={wizard}
-      navHeader={navHeader}
-      onFinish={handleFinish}
-    />
+    <>
+      {submitError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg shadow">
+          {submitError}
+        </div>
+      )}
+      <WizardShell
+        wizard={wizard}
+        navHeader={navHeader}
+        onFinish={handleFinish}
+        submitting={isSubmitting}
+      />
+    </>
   );
 }
