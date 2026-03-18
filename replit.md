@@ -30,6 +30,9 @@ The project employs a pnpm monorepo structure, separating deployable services (`
 -   **Authentication**: JWT-based, stored in `localStorage`.
 -   **Persistence**: API-first for SciNote and Experiment data, with `localStorage` and `sessionStorage` fallbacks/caches.
 -   **Experiment Inheritance**: Server-side inheritance of modules for new experiment records, with a three-state lifecycle (draft, confirmed, confirmed_dirty).
+-   **confirmed_dirty UI**: `DirtyWarningBanner` (amber strip + "立即确认" button) in `ExperimentHeader`; pulse-ring amber confirm button; amber dot on `RecordSwitcher` tabs; amber `ConfirmationStateBadge`. All triggered when the server returns `confirmationState: "confirmed_dirty"` after a PATCH.
+-   **Server State Sync**: `WorkbenchContext.syncServerState()` applies PATCH response `confirmationState` back to local `records` state after every `updateExperiment()` call (modules, title, tags, editor). Fixes confirmed_dirty not appearing in UI.
+-   **`AttributeTagRow` null-guard**: `tags` prop defaulted to `[]` to prevent crash when inherited module has no attributes field.
 
 **Express API Server (`artifacts/api-server`)**:
 -   **Framework**: Express 5.

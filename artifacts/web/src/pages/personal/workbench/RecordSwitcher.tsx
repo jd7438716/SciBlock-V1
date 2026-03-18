@@ -168,6 +168,15 @@ function RecordTab({
         <span className="text-gray-300 font-mono">{String(index).padStart(2, "0")}</span>
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
         <span className="truncate max-w-[120px]">{label}</span>
+        {/* Dirty indicator — shown on all tabs whose confirmed content has
+            been edited since last confirm, so users can see at a glance
+            which records need re-confirmation. */}
+        {record.confirmationState === "confirmed_dirty" && (
+          <span
+            title="内容已修改，需重新确认"
+            className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-400"
+          />
+        )}
 
         {/* "..." only on the active tab */}
         {isActive && (

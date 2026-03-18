@@ -98,13 +98,14 @@ interface Props {
 }
 
 export function AttributeTagRow({
-  tags,
+  tags: tagsProp,
   onChange,
   addLabel = "标签",
   keyPlaceholder,
   valuePlaceholder,
   className = "",
 }: Props) {
+  const tags = tagsProp ?? [];
   const [showAdd, setShowAdd] = useState(false);
 
   function updateTag(id: string, updated: Tag) {

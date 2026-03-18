@@ -369,6 +369,27 @@ export function WorkbenchProvider({
     );
   }
 
+  /**
+   * Apply server-authoritative fields (confirmationState, confirmedAt,
+   * confirmedModules) from a PATCH/POST response to whichever record
+   * matches `recordId`.  Always call this after any successful
+   * updateExperiment() so that transitions like confirmed → confirmed_dirty
+   * are reflected in the UI.
+   */
+  function syncServerState(recordId: string, updated: ExperimentRecord) {
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.id === recordId
+          ? {
+              ...r,
+              confirmationState: updated.confirmationState,
+              confirmedAt: updated.confirmedAt,
+            }
+          : r,
+      ),
+    );
+  }
+
   function patchCurrentModules(
     updater: (modules: OntologyModule[]) => OntologyModule[],
   ) {
@@ -389,14 +410,21 @@ export function WorkbenchProvider({
   function scheduleModulesSync(recordId: string, newModules: OntologyModule[]) {
     if (!isServerId(recordId)) return; // skip if server UUID not yet assigned
     if (modulesDebounceRef.current) clearTimeout(modulesDebounceRef.current);
-    modulesDebounceRef.current = setTimeout(() => {
-      updateExperiment(recordId, { currentModules: newModules }).catch(() => {
+    modulesDebounceRef.current = setTimeout(async () => {
+      try {
+        const updated = await updateExperiment(recordId, {
+          currentModules: newModules,
+        });
+        // Sync confirmationState (confirmed → confirmed_dirty if the record
+        // was already confirmed before this edit).
+        syncServerState(recordId, updated);
+      } catch {
         toast({
           title: "模块保存失败",
           description: "模块数据未能同步到服务器，请稍后重试",
           variant: "destructive",
         });
-      });
+      }
     }, 1500);
   }
 
@@ -514,27 +542,33 @@ export function WorkbenchProvider({
   }
 
   function updateTitle(title: string) {
+    const recId = currentRecord.id;
     patchCurrentRecord({ title });
-    if (!isServerId(currentRecord.id)) return; // skip if server UUID not yet assigned
-    updateExperiment(currentRecord.id, { title }).catch(() => {
-      toast({
-        title: "保存失败",
-        description: "标题未能同步到服务器",
-        variant: "destructive",
+    if (!isServerId(recId)) return; // skip if server UUID not yet assigned
+    updateExperiment(recId, { title })
+      .then((updated) => syncServerState(recId, updated))
+      .catch(() => {
+        toast({
+          title: "保存失败",
+          description: "标题未能同步到服务器",
+          variant: "destructive",
+        });
       });
-    });
   }
 
   function updateStatus(experimentStatus: ExperimentStatus) {
+    const recId = currentRecord.id;
     patchCurrentRecord({ experimentStatus });
-    if (!isServerId(currentRecord.id)) return;
-    updateExperiment(currentRecord.id, { experimentStatus }).catch(() => {
-      toast({
-        title: "保存失败",
-        description: "状态未能同步到服务器",
-        variant: "destructive",
+    if (!isServerId(recId)) return;
+    updateExperiment(recId, { experimentStatus })
+      .then((updated) => syncServerState(recId, updated))
+      .catch(() => {
+        toast({
+          title: "保存失败",
+          description: "状态未能同步到服务器",
+          variant: "destructive",
+        });
       });
-    });
   }
 
   function updateExperimentCode(experimentCode: string) {
@@ -546,28 +580,34 @@ export function WorkbenchProvider({
     if (!trimmed) return;
     if (currentRecord.tags.includes(trimmed)) return;
     const newTags = [...currentRecord.tags, trimmed];
+    const recId = currentRecord.id;
     patchCurrentRecord({ tags: newTags });
-    if (!isServerId(currentRecord.id)) return;
-    updateExperiment(currentRecord.id, { tags: newTags }).catch(() => {
-      toast({
-        title: "保存失败",
-        description: "标签未能同步到服务器",
-        variant: "destructive",
+    if (!isServerId(recId)) return;
+    updateExperiment(recId, { tags: newTags })
+      .then((updated) => syncServerState(recId, updated))
+      .catch(() => {
+        toast({
+          title: "保存失败",
+          description: "标签未能同步到服务器",
+          variant: "destructive",
+        });
       });
-    });
   }
 
   function removeTag(tag: string) {
     const newTags = currentRecord.tags.filter((t) => t !== tag);
+    const recId = currentRecord.id;
     patchCurrentRecord({ tags: newTags });
-    if (!isServerId(currentRecord.id)) return;
-    updateExperiment(currentRecord.id, { tags: newTags }).catch(() => {
-      toast({
-        title: "保存失败",
-        description: "标签未能同步到服务器",
-        variant: "destructive",
+    if (!isServerId(recId)) return;
+    updateExperiment(recId, { tags: newTags })
+      .then((updated) => syncServerState(recId, updated))
+      .catch(() => {
+        toast({
+          title: "保存失败",
+          description: "标签未能同步到服务器",
+          variant: "destructive",
+        });
       });
-    });
   }
 
   function updateEditorContent(html: string) {
@@ -577,14 +617,17 @@ export function WorkbenchProvider({
     if (editorDebounceRef.current) clearTimeout(editorDebounceRef.current);
     const recId = currentRecord.id;
     if (!isServerId(recId)) return; // skip if server UUID not yet assigned
-    editorDebounceRef.current = setTimeout(() => {
-      updateExperiment(recId, { editorContent: html }).catch(() => {
+    editorDebounceRef.current = setTimeout(async () => {
+      try {
+        const updated = await updateExperiment(recId, { editorContent: html });
+        syncServerState(recId, updated);
+      } catch {
         toast({
           title: "保存失败",
           description: "编辑内容未能同步到服务器",
           variant: "destructive",
         });
-      });
+      }
     }, 1500);
   }
 

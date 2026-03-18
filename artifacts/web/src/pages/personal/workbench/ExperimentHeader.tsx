@@ -6,7 +6,11 @@ import { useAiTitleAssist } from "@/hooks/useAiTitleAssist";
 import { useShares } from "@/hooks/useShares";
 import { ExperimentTitleAssist } from "./ExperimentTitleAssist";
 import { StatusPicker } from "./StatusPicker";
-import { InheritanceBanner, ConfirmationStateBadge } from "./InheritanceBanner";
+import {
+  InheritanceBanner,
+  DirtyWarningBanner,
+  ConfirmationStateBadge,
+} from "./InheritanceBanner";
 import { SharedWithAvatars } from "@/components/share/SharedWithAvatars";
 import { ShareModal } from "@/components/share/ShareModal";
 
@@ -14,11 +18,15 @@ import { ShareModal } from "@/components/share/ShareModal";
  * ExperimentHeader — top section of the OntologyPanel.
  *
  * Layout:
- *   Row 0: InheritanceBanner (lineage info, shown only when applicable)
+ *   Row 0: InheritanceBanner   (lineage info — shown when applicable)
+ *   Row 0b: DirtyWarningBanner (shown when confirmationState === "confirmed_dirty")
  *   Row 1: Title + [AI icon] + [分享 button]
- *   Row 2: Status badge + experiment code + [序号 badge] + [确认状态]
+ *   Row 2: Status badge + experiment code + [序号 badge] + [确认状态 badge]
  *   Row 3: Tags
- *   Row 4: [确认保存 button] (always shown)
+ *   Row 4: [确认保存 button] (always shown for persisted records)
+ *
+ * State machine (confirmationState) is owned by WorkbenchContext.
+ * This component reads state + dispatches actions; no local business logic.
  */
 export function ExperimentHeader() {
   const {
@@ -40,7 +48,6 @@ export function ExperimentHeader() {
   const [shareOpen, setShareOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
-  // Only allow sharing for server-persisted records (UUID contains "-").
   const isPersisted = currentRecord.id.includes("-") && !currentRecord.id.startsWith("rec_");
   const canShare = isPersisted && !!currentUser;
 
@@ -95,20 +102,32 @@ export function ExperimentHeader() {
     }
   }
 
+  // Derived UI state from the authoritative confirmationState value.
+  const isDirty = currentRecord.confirmationState === "confirmed_dirty";
+  const isConfirmed = currentRecord.confirmationState === "confirmed";
+
   const confirmButtonLabel = (() => {
     if (isConfirming) return "确认中…";
-    if (currentRecord.confirmationState === "confirmed") return "已确认保存";
-    if (currentRecord.confirmationState === "confirmed_dirty") return "重新确认";
+    if (isConfirmed) return "已确认保存";
+    if (isDirty) return "重新确认";
     return "确认保存";
   })();
 
-  const confirmButtonDisabled = isConfirming || currentRecord.confirmationState === "confirmed";
+  // Confirmed (clean) → disable; dirty or draft → enabled.
+  const confirmButtonDisabled = isConfirming || isConfirmed;
 
   return (
     <div className="flex flex-col border-b border-gray-100 bg-white flex-shrink-0">
 
-      {/* Lineage banner (shown only when this record inherited from a prior context) */}
+      {/* Row 0: Lineage banner */}
       <InheritanceBanner record={currentRecord} />
+
+      {/* Row 0b: Dirty warning — shown prominently when the user has edited a
+          confirmed record and hasn't re-confirmed yet. Provides one-click
+          shortcut to re-confirm without scrolling to the button below. */}
+      {isPersisted && isDirty && (
+        <DirtyWarningBanner isConfirming={isConfirming} onConfirm={handleConfirm} />
+      )}
 
       <div className="flex flex-col gap-3 px-4 py-3">
 
@@ -123,7 +142,6 @@ export function ExperimentHeader() {
               className="flex-1 min-w-0 text-sm font-semibold text-gray-900 bg-transparent outline-none border-b border-gray-200 focus:border-gray-500 pb-0.5 placeholder-gray-300 transition-colors"
             />
 
-            {/* AI assist toggle */}
             <button
               title="AI 辅助生成标题"
               onClick={() => assist.setAiAssistOpen(!assist.aiAssistOpen)}
@@ -137,7 +155,6 @@ export function ExperimentHeader() {
               <Sparkles size={13} />
             </button>
 
-            {/* Share button — prominent, always visible for persisted records */}
             {canShare && (
               <button
                 type="button"
@@ -156,11 +173,10 @@ export function ExperimentHeader() {
             )}
           </div>
 
-          {/* AI assist popover anchored below the title row */}
           <ExperimentTitleAssist {...assist} />
         </div>
 
-        {/* Row 2: Status badge + experiment code + seq number + confirm state */}
+        {/* Row 2: Status + code + seq + confirmation badge */}
         <div className="flex items-center gap-2 flex-wrap">
           <StatusPicker
             value={currentRecord.experimentStatus}
@@ -175,17 +191,14 @@ export function ExperimentHeader() {
             className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-600 outline-none focus:border-gray-400 w-24 font-mono"
           />
 
-          {/* Sequence number badge — shown for persisted records */}
           {isPersisted && currentRecord.sequenceNumber > 0 && (
             <span className="text-[11px] text-gray-400 font-mono">
               #{currentRecord.sequenceNumber}
             </span>
           )}
 
-          {/* Confirmation state badge */}
           {isPersisted && <ConfirmationStateBadge record={currentRecord} />}
 
-          {/* Shared-with avatars inline with status row */}
           {canShare && shares.recipients.length > 0 && (
             <SharedWithAvatars recipients={shares.recipients} />
           )}
@@ -235,36 +248,47 @@ export function ExperimentHeader() {
           )}
         </div>
 
-        {/* Row 4: Confirm-save button */}
+        {/* Row 4: Confirm-save button
+            - draft         → dark / primary style
+            - confirmed     → muted green / disabled
+            - confirmed_dirty → amber + pulse-ring to draw immediate attention */}
         {isPersisted && (
           <div className="flex items-center">
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={confirmButtonDisabled}
-              className={[
-                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                currentRecord.confirmationState === "confirmed"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
-                  : currentRecord.confirmationState === "confirmed_dirty"
-                  ? "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
-                  : "bg-gray-900 text-white hover:bg-gray-700",
-                isConfirming ? "opacity-60 cursor-not-allowed" : "",
-              ].join(" ")}
-            >
-              {isConfirming ? (
-                <Loader2 size={11} className="animate-spin" />
-              ) : (
-                <CheckCheck size={11} />
+            <div className={isDirty ? "relative" : ""}>
+              {/* Pulse ring — only rendered for the dirty state */}
+              {isDirty && !isConfirming && (
+                <span
+                  aria-hidden
+                  className="absolute inset-0 rounded-md bg-amber-400 opacity-30 animate-ping"
+                />
               )}
-              {confirmButtonLabel}
-            </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={confirmButtonDisabled}
+                className={[
+                  "relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
+                  isConfirmed
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
+                    : isDirty
+                    ? "bg-amber-500 text-white border border-amber-600 hover:bg-amber-600 shadow-sm"
+                    : "bg-gray-900 text-white hover:bg-gray-700",
+                  isConfirming ? "opacity-60 cursor-not-allowed" : "",
+                ].join(" ")}
+              >
+                {isConfirming ? (
+                  <Loader2 size={11} className="animate-spin" />
+                ) : (
+                  <CheckCheck size={11} />
+                )}
+                {confirmButtonLabel}
+              </button>
+            </div>
           </div>
         )}
 
       </div>
 
-      {/* Share modal */}
       {shareOpen && (
         <ShareModal
           resourceTitle={currentRecord.title || "此实验记录"}
