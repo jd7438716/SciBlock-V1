@@ -3,6 +3,8 @@ import type {
   ExperimentRecord,
   ExperimentStatus,
   OntologyModule,
+  ConfirmationState,
+  DerivedFromSourceType,
 } from "@/types/workbench";
 
 // ---------------------------------------------------------------------------
@@ -25,6 +27,14 @@ interface ExperimentApiResponse {
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
+  // Inheritance-chain fields
+  sequenceNumber: number;
+  confirmationState: ConfirmationState;
+  confirmedAt: string | null;
+  derivedFromSourceType: DerivedFromSourceType;
+  derivedFromRecordId: string | null;
+  derivedFromRecordSeq: number | null;
+  derivedFromContextVer: number;
 }
 
 interface ListExperimentsResponse {
@@ -77,6 +87,14 @@ export function apiResponseToRecord(api: ExperimentApiResponse): ExperimentRecor
     createdAt: api.createdAt,
     updatedAt: api.updatedAt,
     reportHtml: api.reportHtml ?? undefined,
+    // Inheritance-chain fields
+    sequenceNumber: api.sequenceNumber ?? 1,
+    confirmationState: api.confirmationState ?? "draft",
+    confirmedAt: api.confirmedAt ?? undefined,
+    derivedFromSourceType: api.derivedFromSourceType ?? "initial",
+    derivedFromRecordId: api.derivedFromRecordId ?? undefined,
+    derivedFromRecordSeq: api.derivedFromRecordSeq ?? undefined,
+    derivedFromContextVer: api.derivedFromContextVer ?? 0,
   };
 }
 
@@ -122,6 +140,25 @@ export async function updateExperiment(
     method: "PATCH",
     body: JSON.stringify(req),
   });
+  return apiResponseToRecord(resp);
+}
+
+/**
+ * confirmExperiment — executes the confirm-save workflow for an experiment record.
+ *
+ * The server:
+ *   1. Extracts heritable modules from the record's current state.
+ *   2. Snapshots them into confirmed_modules.
+ *   3. If this record is the chain head, advances the SciNote's inheritance context.
+ *   4. Returns the updated record (confirmationState = "confirmed").
+ *
+ * No request body is needed — the server reads the current record state.
+ */
+export async function confirmExperiment(id: string): Promise<ExperimentRecord> {
+  const resp = await apiFetch<ExperimentApiResponse>(
+    `/experiments/${id}/confirm`,
+    { method: "POST" },
+  );
   return apiResponseToRecord(resp);
 }
 

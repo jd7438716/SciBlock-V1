@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 
 	"sciblock/go-api/internal/domain"
 )
@@ -29,4 +30,24 @@ type SciNoteRepository interface {
 
 	// SoftDelete sets is_deleted=true on the given SciNote.
 	SoftDelete(ctx context.Context, id string) error
+
+	// SetInitialModules writes heritable modules into scinotes.initial_modules
+	// ONLY when the column is currently NULL (immutable after first write).
+	// No-op when initial_modules is already set.
+	// Returns the current (possibly unchanged) SciNote.
+	SetInitialModules(ctx context.Context, id string, modules json.RawMessage) (*domain.SciNote, error)
+
+	// AdvanceContext atomically:
+	//   1. Updates current_confirmed_modules = newModules.
+	//   2. Increments context_version by 1.
+	//   3. Sets last_confirmed_record_id = lastRecordID.
+	//   4. Sets last_confirmed_record_seq = lastRecordSeq.
+	// Returns the new context_version after the update.
+	AdvanceContext(
+		ctx context.Context,
+		id string,
+		newModules json.RawMessage,
+		lastRecordID string,
+		lastRecordSeq int,
+	) (newContextVersion int, err error)
 }

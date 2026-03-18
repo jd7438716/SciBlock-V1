@@ -91,11 +91,21 @@ func (s *ExperimentService) Get(ctx context.Context, id, callerUserID string) (*
 	return nil, ErrForbidden
 }
 
-// Create inserts a new ExperimentRecord under sciNoteID.
-// Business defaults are applied here before persisting:
-//   - ExperimentStatus defaults to domain.StatusExploring when not provided.
-//   - Tags nil is normalized to an empty slice.
-func (s *ExperimentService) Create(ctx context.Context, sciNoteID string, input domain.ExperimentRecord, callerUserID string) (*domain.ExperimentRecord, error) {
+// Create inserts a new ExperimentRecord under sciNoteID, applying inheritance logic.
+//
+// Inheritance resolution (server-authoritative):
+//  1. If scinotes.current_confirmed_modules is set → use it as the default for heritable modules.
+//  2. Else if scinotes.initial_modules is set → use it.
+//  3. Else (first record ever for this SciNote):
+//     a. Extract heritable modules from input.CurrentModules.
+//     b. Persist them as scinotes.initial_modules (immutable after this first write).
+//     c. Use the extracted modules as defaults.
+//
+// The merged modules are written into experiment_records.current_modules.
+// Lineage fields (derived_from_*) are set from the SciNote's current context.
+// sequence_number is assigned as COUNT(existing active records) + 1.
+func (s *ExperimentService) Create(ctx context.Context, sciNoteID string, input domain.CreateExperimentInput, callerUserID string) (*domain.ExperimentRecord, error) {
+	// 1. Ownership check.
 	note, err := s.sciNotes.GetByID(ctx, sciNoteID)
 	if err != nil {
 		return nil, fmt.Errorf("get scinote: %w", err)
@@ -107,16 +117,96 @@ func (s *ExperimentService) Create(ctx context.Context, sciNoteID string, input 
 		return nil, ErrForbidden
 	}
 
-	// Apply business defaults.
-	if input.ExperimentStatus == "" {
-		input.ExperimentStatus = domain.StatusExploring
+	// 2. Assign next sequence number.
+	seqNum, err := s.repo.NextSequenceNumber(ctx, sciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("next sequence number: %w", err)
 	}
-	if input.Tags == nil {
-		input.Tags = []string{}
-	}
-	input.SciNoteID = sciNoteID
 
-	created, err := s.repo.Create(ctx, input)
+	// 3. Resolve inheritance source.
+	var (
+		heritableDefaults   = note.CurrentConfirmedModules // non-nil → use confirmed context
+		sourceType          = domain.SourceRecord
+		sourceDerivedFromID *string
+		sourceDerivedSeq    *int
+		contextVer          = note.ContextVersion
+	)
+
+	if len(heritableDefaults) == 0 {
+		// No confirmed context yet — fall back to initial_modules.
+		heritableDefaults = note.InitialModules
+		sourceType = domain.SourceInitial
+		sourceDerivedFromID = nil
+		sourceDerivedSeq = nil
+	} else {
+		// Confirmed context exists — record lineage to the last confirmed record.
+		sourceDerivedFromID = note.LastConfirmedRecordID
+		sourceDerivedSeq = note.LastConfirmedRecordSeq
+	}
+
+	if len(heritableDefaults) == 0 {
+		// Bootstrap case: no initial_modules set yet.
+		// Extract heritable modules from the caller-supplied modules and store them
+		// as the immutable initial_modules for this SciNote.
+		extracted, extractErr := domain.ExtractHeritableModules(input.CurrentModules)
+		if extractErr != nil {
+			// Non-fatal: proceed without inheritance if extraction fails.
+			extracted = nil
+		}
+		if len(extracted) > 0 {
+			if _, setErr := s.sciNotes.SetInitialModules(ctx, sciNoteID, extracted); setErr != nil {
+				// Non-fatal: initial_modules may already be set by a concurrent request.
+				// Re-fetch to get the current state.
+				if refreshed, refErr := s.sciNotes.GetByID(ctx, sciNoteID); refErr == nil && refreshed != nil {
+					note = refreshed
+					if len(note.InitialModules) > 0 {
+						heritableDefaults = note.InitialModules
+					}
+				}
+			} else {
+				heritableDefaults = extracted
+			}
+		}
+		sourceType = domain.SourceInitial
+	}
+
+	// 4. Merge inherited heritable modules into the new record's modules.
+	//    Non-heritable slots (e.g. "data") are kept from the caller-supplied modules.
+	mergedModules, mergeErr := domain.MergeHeritableModules(input.CurrentModules, heritableDefaults)
+	if mergeErr != nil {
+		mergedModules = input.CurrentModules // fallback: use caller modules as-is
+	}
+
+	// 5. Apply business defaults.
+	status := input.ExperimentStatus
+	if status == "" {
+		status = domain.StatusExploring
+	}
+	tags := input.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
+	// 6. Persist the new record.
+	rec := domain.ExperimentRecord{
+		SciNoteID:             sciNoteID,
+		Title:                 input.Title,
+		PurposeInput:          input.PurposeInput,
+		ExperimentStatus:      status,
+		ExperimentCode:        input.ExperimentCode,
+		Tags:                  tags,
+		EditorContent:         input.EditorContent,
+		CurrentModules:        mergedModules,
+		InheritedVersionID:    input.InheritedVersionID,
+		SequenceNumber:        seqNum,
+		ConfirmationState:     domain.Statedraft,
+		DerivedFromSourceType: sourceType,
+		DerivedFromRecordID:   sourceDerivedFromID,
+		DerivedFromRecordSeq:  sourceDerivedSeq,
+		DerivedFromContextVer: contextVer,
+	}
+
+	created, err := s.repo.Create(ctx, rec)
 	if err != nil {
 		return nil, fmt.Errorf("create experiment: %w", err)
 	}
@@ -125,6 +215,11 @@ func (s *ExperimentService) Create(ctx context.Context, sciNoteID string, input 
 
 // Update applies a partial patch to an ExperimentRecord, verifying ownership.
 // Only non-nil fields in the patch are written to the database.
+//
+// Dirty-state transition: if the patch includes CurrentModules AND the record's
+// current confirmation_state is "confirmed", the record is transitioned to
+// "confirmed_dirty" so the frontend can display the appropriate indicator and
+// prompt the user to re-confirm.
 //
 // Note: Update intentionally does NOT fall back to share access — recipients
 // may only read shared content, not modify it.
@@ -149,7 +244,98 @@ func (s *ExperimentService) Update(ctx context.Context, id string, patch domain.
 	if err != nil {
 		return nil, fmt.Errorf("update experiment: %w", err)
 	}
+
+	// Dirty-state transition: if current_modules changed on a confirmed record,
+	// mark the record confirmed_dirty.  MarkDirty is a no-op for non-confirmed records.
+	if len(patch.CurrentModules) > 0 && rec.ConfirmationState == domain.StateConfirmed {
+		if dirtyErr := s.repo.MarkDirty(ctx, id); dirtyErr != nil {
+			// Non-fatal: log and continue; the update itself succeeded.
+			// In practice MarkDirty only fails on DB connection errors.
+			_ = dirtyErr
+		} else if updated != nil {
+			updated.ConfirmationState = domain.StateConfirmedDirty
+		}
+	}
+
 	return updated, nil
+}
+
+// Confirm executes the confirm-save workflow for an ExperimentRecord.
+//
+// Idempotency rules:
+//   - If the record is already confirmed AND the heritable content of
+//     current_modules matches confirmed_modules → pure no-op, return current record.
+//   - If the record is draft → first confirm: always advances the inheritance chain.
+//   - If the record is confirmed_dirty → re-confirm: advances the chain only if this
+//     record is still the "head" (i.e. it is the SciNote's last confirmed record).
+//     Otherwise only the record itself is updated (no chain advancement).
+//
+// All state transitions are managed here; no confirmation logic escapes to the handler.
+func (s *ExperimentService) Confirm(ctx context.Context, id, callerUserID string) (*domain.ExperimentRecord, error) {
+	// 1. Fetch current record.
+	rec, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get experiment for confirm: %w", err)
+	}
+	if rec == nil {
+		return nil, ErrNotFound
+	}
+
+	// 2. Ownership check.
+	note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("get parent scinote for confirm: %w", err)
+	}
+	if note == nil || note.UserID != callerUserID {
+		return nil, ErrForbidden
+	}
+
+	// 3. Extract heritable modules from current state.
+	newConfirmedModules, err := domain.ExtractHeritableModules(rec.CurrentModules)
+	if err != nil {
+		return nil, fmt.Errorf("extract heritable modules: %w", err)
+	}
+
+	// 4. Idempotency guard: already confirmed with same content → no-op.
+	if rec.ConfirmationState == domain.StateConfirmed {
+		if modulesJSONEqual(newConfirmedModules, rec.ConfirmedModules) {
+			return rec, nil // true idempotent no-op
+		}
+		// Content changed on an already-confirmed record → treat as re-confirm
+		// (same code path as confirmed_dirty below).
+	}
+
+	// 5. Determine whether this confirm should advance the SciNote's inheritance chain.
+	//
+	//    The chain advances when:
+	//      a) The record is being confirmed for the first time (draft), OR
+	//      b) The record is re-confirming AND it is the SciNote's current head
+	//         (i.e. the SciNote's last_confirmed_record_id == this record's id).
+	//
+	//    Re-confirming a historical record (not the head) updates the record itself
+	//    but does NOT rewrite the current context, avoiding time-travel issues.
+	var advanceContext bool
+	switch rec.ConfirmationState {
+	case domain.Statedraft:
+		advanceContext = true
+	case domain.StateConfirmed, domain.StateConfirmedDirty:
+		isHead := note.LastConfirmedRecordID != nil && *note.LastConfirmedRecordID == id
+		advanceContext = isHead
+	}
+
+	// 6. Atomically update the record (and optionally the SciNote context).
+	confirmed, err := s.repo.ConfirmRecord(
+		ctx,
+		id,
+		newConfirmedModules,
+		advanceContext,
+		rec.SciNoteID,
+		rec.SequenceNumber,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("confirm record: %w", err)
+	}
+	return confirmed, nil
 }
 
 // SoftDelete moves an ExperimentRecord to the trash (sets is_deleted=true).
@@ -225,4 +411,26 @@ func (s *ExperimentService) Restore(ctx context.Context, id, callerUserID string
 // the instructor handler) are responsible for verifying access before calling this.
 func (s *ExperimentService) CountBySciNoteIDs(ctx context.Context, ids []string) (map[string]int, error) {
 	return s.repo.CountBySciNoteIDs(ctx, ids)
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+// modulesJSONEqual does a byte-level comparison of two JSON blobs.
+// This is sufficient for idempotency checks because the same extracted content
+// will produce identical JSON bytes when re-extracted from unchanged modules.
+func modulesJSONEqual(a, b []byte) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

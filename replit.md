@@ -49,7 +49,8 @@ The project is a pnpm monorepo with `artifacts/` (deployable services) and `lib/
 - **Base path**: `BASE_PATH` env var (defaults to `/`); injected by Replit at runtime
 - **Port**: `PORT` env var (default 22333)
 - **SciNote persistence**: API-first (Go backend); localStorage fallback when API unavailable
-- **Experiment persistence**: API-first (Go backend); sessionStorage as cache/fallback. `WorkbenchContext` bootstraps from `GET /api/scinotes/:id/experiments` on mount; all mutations (create, title, status, tags, editor, modules, trash, restore) go to the Go API. PATCH calls are guarded by `isServerId()` to skip temp-ID records not yet promoted to the server.
+- **Experiment persistence**: API-first (Go backend); sessionStorage as cache/fallback. `WorkbenchContext` bootstraps from `GET /api/scinotes/:id/experiments` on mount; all mutations (create, title, status, tags, editor, modules, trash, restore, confirm) go to the Go API. PATCH calls are guarded by `isServerId()` to skip temp-ID records not yet promoted to the server.
+- **Experiment Inheritance Chain** (migration `20260315004`): Server-side inheritance on record creation. Heritable modules (system/preparation/operation/measurement, NOT data) auto-inherit from `scinotes.current_confirmed_modules` → fallback to `scinotes.initial_modules` → bootstrap. Confirm-save (`POST /api/experiments/:id/confirm`) advances the SciNote's context version. Three-state lifecycle: `draft → confirmed → confirmed_dirty` (dirty when modules edited post-confirm). `ExperimentHeader` shows: InheritanceBanner (lineage display), sequence number badge, ConfirmationStateBadge, and 确认保存 button. `createNewRecord` replaces entire temp record with server response to apply inherited modules.
 
 ## Express API Server (`artifacts/api-server`)
 

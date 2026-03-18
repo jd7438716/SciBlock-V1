@@ -19,7 +19,7 @@
 
 import type { SciNote } from "@/types/scinote";
 import type { WizardFormData } from "@/types/wizardForm";
-import type { ExperimentRecord, OntologyModule } from "@/types/workbench";
+import type { ExperimentRecord, OntologyModule, ConfirmationState, DerivedFromSourceType } from "@/types/workbench";
 import { apiFetch } from "./client";
 import { apiResponseToRecord } from "./experiments";
 
@@ -61,6 +61,14 @@ interface MemberExperimentApiResponse {
   isDeleted:          boolean;
   createdAt:          string;
   updatedAt:          string;
+  // Inheritance-chain fields (present on all records since migration 20260315004)
+  sequenceNumber:         number;
+  confirmationState:      ConfirmationState;
+  confirmedAt:            string | null;
+  derivedFromSourceType:  DerivedFromSourceType;
+  derivedFromRecordId:    string | null;
+  derivedFromRecordSeq:   number | null;
+  derivedFromContextVer:  number;
 }
 
 interface ListMemberSciNotesResponse {

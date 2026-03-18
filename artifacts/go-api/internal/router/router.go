@@ -84,6 +84,7 @@ func New(
                         r.Patch("/experiments/{id}", experimentH.Update)
                         r.Delete("/experiments/{id}", experimentH.SoftDelete)
                         r.Patch("/experiments/{id}/restore", experimentH.Restore)
+                        r.Post("/experiments/{id}/confirm", experimentH.Confirm)
                 })
 
                 // Instructor-only — read access to any student's data.

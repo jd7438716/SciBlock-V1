@@ -60,6 +60,10 @@ export function createExperimentRecord(
     currentModules: cloneModules(inheritedVersion.modules),
     editorContent: "",
     createdAt: now,
+    sequenceNumber: index,
+    confirmationState: "draft",
+    derivedFromSourceType: "initial",
+    derivedFromContextVer: 0,
   };
 }
 
@@ -87,6 +91,10 @@ export function createExperimentRecordWithModules(
     currentModules: cloneModules(modules),
     editorContent: "",
     createdAt: now,
+    sequenceNumber: index,
+    confirmationState: "draft",
+    derivedFromSourceType: "initial",
+    derivedFromContextVer: 0,
   };
 }
 

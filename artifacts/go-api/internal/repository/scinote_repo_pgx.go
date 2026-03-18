@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -22,17 +23,19 @@ func NewSciNoteRepository(pool *pgxpool.Pool) SciNoteRepository {
 }
 
 const sciNoteColumns = `
-	id, user_id, title, kind,
-	experiment_type, objective, form_data,
-	is_deleted, created_at, updated_at`
+        id, user_id, title, kind,
+        experiment_type, objective, form_data,
+        is_deleted, created_at, updated_at,
+        initial_modules, current_confirmed_modules, context_version,
+        last_confirmed_record_id, last_confirmed_record_seq`
 
 // ListByUser returns all non-deleted SciNotes owned by userID, newest first.
 func (r *pgxSciNoteRepository) ListByUser(ctx context.Context, userID string) ([]domain.SciNote, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT`+sciNoteColumns+`
-		 FROM scinotes
-		 WHERE user_id = $1 AND is_deleted = false
-		 ORDER BY updated_at DESC`,
+                 FROM scinotes
+                 WHERE user_id = $1 AND is_deleted = false
+                 ORDER BY updated_at DESC`,
 		userID,
 	)
 	if err != nil {
@@ -62,7 +65,7 @@ func (r *pgxSciNoteRepository) ListByUser(ctx context.Context, userID string) ([
 func (r *pgxSciNoteRepository) GetByID(ctx context.Context, id string) (*domain.SciNote, error) {
 	row := r.pool.QueryRow(ctx,
 		`SELECT`+sciNoteColumns+`
-		 FROM scinotes WHERE id = $1`,
+                 FROM scinotes WHERE id = $1`,
 		id,
 	)
 	n, err := scanSciNote(row)
@@ -79,16 +82,17 @@ func (r *pgxSciNoteRepository) GetByID(ctx context.Context, id string) (*domain.
 func (r *pgxSciNoteRepository) Create(ctx context.Context, note domain.SciNote) (*domain.SciNote, error) {
 	row := r.pool.QueryRow(ctx,
 		`INSERT INTO scinotes
-			(id, user_id, title, kind, experiment_type, objective, form_data)
-		 VALUES
-			(gen_random_uuid(), $1, $2, $3, $4, $5, $6)
-		 RETURNING`+sciNoteColumns,
+                        (id, user_id, title, kind, experiment_type, objective, form_data, initial_modules)
+                 VALUES
+                        (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)
+                 RETURNING`+sciNoteColumns,
 		note.UserID,
 		note.Title,
 		note.Kind,
 		note.ExperimentType,
 		note.Objective,
 		nullableJSON(note.FormData),
+		nullableJSON(note.InitialModules),
 	)
 	n, err := scanSciNote(row)
 	if err != nil {
@@ -159,6 +163,55 @@ func (r *pgxSciNoteRepository) SoftDelete(ctx context.Context, id string) error 
 	return nil
 }
 
+// SetInitialModules writes initial_modules ONLY when it is currently NULL.
+// Subsequent calls are no-ops that return the current row unchanged.
+func (r *pgxSciNoteRepository) SetInitialModules(ctx context.Context, id string, modules json.RawMessage) (*domain.SciNote, error) {
+	row := r.pool.QueryRow(ctx,
+		`UPDATE scinotes
+                 SET initial_modules = $1, updated_at = now()
+                 WHERE id = $2 AND initial_modules IS NULL
+                 RETURNING`+sciNoteColumns,
+		[]byte(modules), id,
+	)
+	n, err := scanSciNote(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Already set — return current row without modification.
+			return r.GetByID(ctx, id)
+		}
+		return nil, fmt.Errorf("SetInitialModules: %w", err)
+	}
+	return n, nil
+}
+
+// AdvanceContext atomically updates current_confirmed_modules, bumps context_version,
+// and records which record triggered the advance.
+// Returns the new context_version.
+func (r *pgxSciNoteRepository) AdvanceContext(
+	ctx context.Context,
+	id string,
+	newModules json.RawMessage,
+	lastRecordID string,
+	lastRecordSeq int,
+) (int, error) {
+	var newVersion int
+	err := r.pool.QueryRow(ctx,
+		`UPDATE scinotes
+                 SET current_confirmed_modules = $1,
+                     context_version           = context_version + 1,
+                     last_confirmed_record_id  = $2,
+                     last_confirmed_record_seq = $3,
+                     updated_at               = now()
+                 WHERE id = $4
+                 RETURNING context_version`,
+		[]byte(newModules), lastRecordID, lastRecordSeq, id,
+	).Scan(&newVersion)
+	if err != nil {
+		return 0, fmt.Errorf("AdvanceContext: %w", err)
+	}
+	return newVersion, nil
+}
+
 // ---------------------------------------------------------------------------
 // Scan helpers
 // ---------------------------------------------------------------------------
@@ -170,34 +223,46 @@ type sciNoteScanner interface {
 
 func scanSciNote(row sciNoteScanner) (*domain.SciNote, error) {
 	var (
-		id             string
-		userID         string
-		title          string
-		kind           string
-		experimentType *string
-		objective      *string
-		formData       []byte
-		isDeleted      bool
-		createdAt      time.Time
-		updatedAt      time.Time
+		id                      string
+		userID                  string
+		title                   string
+		kind                    string
+		experimentType          *string
+		objective               *string
+		formData                []byte
+		isDeleted               bool
+		createdAt               time.Time
+		updatedAt               time.Time
+		initialModules          []byte
+		currentConfirmedModules []byte
+		contextVersion          int
+		lastConfirmedRecordID   *string
+		lastConfirmedRecordSeq  *int
 	)
 	if err := row.Scan(
 		&id, &userID, &title, &kind,
 		&experimentType, &objective, &formData,
 		&isDeleted, &createdAt, &updatedAt,
+		&initialModules, &currentConfirmedModules, &contextVersion,
+		&lastConfirmedRecordID, &lastConfirmedRecordSeq,
 	); err != nil {
 		return nil, err
 	}
 	return &domain.SciNote{
-		ID:             id,
-		UserID:         userID,
-		Title:          title,
-		Kind:           kind,
-		ExperimentType: experimentType,
-		Objective:      objective,
-		FormData:       jsonOrNil(formData),
-		IsDeleted:      isDeleted,
-		CreatedAt:      createdAt,
-		UpdatedAt:      updatedAt,
+		ID:                      id,
+		UserID:                  userID,
+		Title:                   title,
+		Kind:                    kind,
+		ExperimentType:          experimentType,
+		Objective:               objective,
+		FormData:                jsonOrNil(formData),
+		IsDeleted:               isDeleted,
+		CreatedAt:               createdAt,
+		UpdatedAt:               updatedAt,
+		InitialModules:          jsonOrNil(initialModules),
+		CurrentConfirmedModules: jsonOrNil(currentConfirmedModules),
+		ContextVersion:          contextVersion,
+		LastConfirmedRecordID:   lastConfirmedRecordID,
+		LastConfirmedRecordSeq:  lastConfirmedRecordSeq,
 	}, nil
 }

@@ -11,6 +11,13 @@ import (
 // The Go backend treats it as an opaque blob and never parses the internal
 // structure — that is the frontend's responsibility.  This means backend code
 // is decoupled from changes to the wizard step schemas.
+//
+// Inheritance-chain fields (added in migration 20260315004):
+//   - InitialModules            : heritable module snapshot from wizard; immutable after first set.
+//   - CurrentConfirmedModules   : latest confirmed heritable snapshot; advances on each confirm.
+//   - ContextVersion            : monotonic counter; incremented each time the context advances.
+//   - LastConfirmedRecordID     : ID of the record that last advanced the context.
+//   - LastConfirmedRecordSeq    : sequence_number of that record (for banner display).
 type SciNote struct {
 	ID             string
 	UserID         string
@@ -22,6 +29,13 @@ type SciNote struct {
 	IsDeleted      bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+
+	// Inheritance-chain fields
+	InitialModules           json.RawMessage // heritable modules from wizard; nil until first record
+	CurrentConfirmedModules  json.RawMessage // nil until first confirm
+	ContextVersion           int
+	LastConfirmedRecordID    *string
+	LastConfirmedRecordSeq   *int
 }
 
 // SciNotePatch carries the fields that may be updated via PATCH /api/scinotes/:id.
@@ -32,4 +46,5 @@ type SciNotePatch struct {
 	ExperimentType *string
 	Objective      *string
 	FormData       json.RawMessage // nil = no change
+	InitialModules json.RawMessage // nil = no change (only set once; guarded in repo)
 }

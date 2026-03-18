@@ -41,6 +41,7 @@ import {
   updateExperiment,
   deleteExperiment,
   restoreExperiment,
+  confirmExperiment,
 } from "@/api/experiments";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,10 @@ const EMPTY_RECORD: ExperimentRecord = {
   currentModules: [],
   editorContent: "",
   createdAt: new Date().toISOString(),
+  sequenceNumber: 0,
+  confirmationState: "draft",
+  derivedFromSourceType: "initial",
+  derivedFromContextVer: 0,
 };
 
 // ---------------------------------------------------------------------------
@@ -88,6 +93,13 @@ interface WorkbenchContextValue {
   createNewRecord: () => void;
   /** Move an unconfirmed record to the global trash (soft-delete). */
   moveToTrash: (recordId: string) => void;
+  /**
+   * Confirm-save the current record.
+   * Calls POST /api/experiments/:id/confirm and replaces the record in state
+   * with the server response (confirmationState → "confirmed").
+   * No-op if the record has a local temp ID (not yet persisted server-side).
+   */
+  confirmRecord: () => Promise<void>;
   updateTitle: (title: string) => void;
   updateStatus: (status: ExperimentStatus) => void;
   updateExperimentCode: (code: string) => void;
@@ -435,7 +447,8 @@ export function WorkbenchProvider({
     setFlowDraftInserted(false);
     clearHighlights();
 
-    // POST to API async; swap only the ID on success, preserving local content.
+    // POST to API async; replace the entire local record with the server response
+    // so inherited modules from the inheritance chain are applied correctly.
     // Use a fallback title because Go requires a non-empty title field.
     createExperiment(sciNoteId, {
       title: localRecord.title || "未命名实验",
@@ -447,10 +460,11 @@ export function WorkbenchProvider({
       inheritedVersionId: localRecord.inheritedOntologyVersionId,
     })
       .then((serverRecord) => {
+        // Replace the entire local temp record with the server-authoritative record.
+        // This ensures inherited modules (set by server-side inheritance logic) are
+        // reflected in the UI immediately after creation.
         setRecords((prev) =>
-          prev.map((r) =>
-            r.id === localRecord.id ? { ...r, id: serverRecord.id } : r,
-          ),
+          prev.map((r) => (r.id === localRecord.id ? serverRecord : r)),
         );
         setCurrentRecordId((prev) =>
           prev === localRecord.id ? serverRecord.id : prev,
@@ -463,6 +477,24 @@ export function WorkbenchProvider({
           variant: "destructive",
         });
       });
+  }
+
+  async function confirmRecord() {
+    if (!isServerId(currentRecord.id)) return; // temp ID — server doesn't know this record yet
+    try {
+      const confirmed = await confirmExperiment(currentRecord.id);
+      // Replace the entire record with the server response to get the updated
+      // confirmationState, confirmedAt, and confirmed_modules fields.
+      setRecords((prev) =>
+        prev.map((r) => (r.id === confirmed.id ? confirmed : r)),
+      );
+    } catch {
+      toast({
+        title: "确认保存失败",
+        description: "未能同步到服务器，请稍后重试",
+        variant: "destructive",
+      });
+    }
   }
 
   function updateTitle(title: string) {
@@ -700,6 +732,7 @@ export function WorkbenchProvider({
     switchRecord,
     createNewRecord,
     moveToTrash,
+    confirmRecord,
     updateTitle,
     updateStatus,
     updateExperimentCode,
