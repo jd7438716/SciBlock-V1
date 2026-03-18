@@ -33,7 +33,7 @@ export function NewExperimentPage() {
 
   async function handleFinish() {
     const id = await createSciNote(wizard.form.data);
-    navigate(`/personal/experiment/${id}`);
+    navigate(`/personal/experiment/${id}/workbench`);
   }
 
   const navHeader = (

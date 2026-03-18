@@ -16,7 +16,7 @@ import type { NavItem, NavGroup } from "@/config/navigation";
 const DRAFT_FALLBACK = "未命名实验";
 
 function sciNoteHref(kind: "placeholder" | "wizard", id: string): string {
-  return kind === "wizard" ? `/personal/experiment/${id}` : `/personal/note/${id}`;
+  return kind === "wizard" ? `/personal/experiment/${id}/workbench` : `/personal/note/${id}`;
 }
 
 function GroupHeader({ group }: { group: NavGroup }) {
