@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ReportListPanel } from "./ReportListPanel";
 import { ReportWorkPanel } from "./ReportWorkPanel";
@@ -24,10 +24,14 @@ function isMonday(isoDate: string): boolean {
 
 function NewReportForm({ onConfirm, onCancel }: NewReportDialogProps) {
   const { weekStart, weekEnd } = getCurrentWeekDefaults();
-  const [title, setTitle] = useState(`周报 ${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`);
   const [ws, setWs] = useState(weekStart);
   // 结束日期自动根据开始日期计算（+6天）
   const we = useMemo(() => addDaysToISODate(ws, 6), [ws]);
+  // 标题随日期自动更新
+  const [title, setTitle] = useState(`周报 ${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`);
+  useEffect(() => {
+    setTitle(`周报 ${fmtDate(ws)} – ${fmtDate(we)}`);
+  }, [ws, we]);
 
   // 日期限制：只允许选择过去4周到未来2周内的周一
   const maxDate = useMemo(() => addDaysToISODate(getCurrentWeekDefaults().weekStart, 14), []);

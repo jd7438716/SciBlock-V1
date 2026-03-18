@@ -11,6 +11,7 @@
 import { useState } from "react";
 import type { WeeklyReport } from "../../../types/team";
 import { AttrPill } from "../../../components/team/AttrPill";
+import { fmtDate } from "../../../types/weeklyReport";
 
 export interface ReportCardProps {
   report: WeeklyReport;
@@ -49,9 +50,15 @@ export function ReportCard({ report }: ReportCardProps) {
       {/* Attribute pills */}
       <div className="px-3 pb-2 flex flex-wrap gap-1.5">
         <AttrPill
-          label="提交"
-          value={new Date(report.submittedAt).toLocaleDateString("zh-CN")}
+          label="周期"
+          value={`${fmtDate(report.weekStart)} - ${report.weekEnd ? fmtDate(report.weekEnd) : "?"}`}
         />
+        {report.submittedAt && (
+          <AttrPill
+            label="提交"
+            value={new Date(report.submittedAt).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}
+          />
+        )}
       </div>
 
       {/* Expanded content */}

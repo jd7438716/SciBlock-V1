@@ -83,6 +83,7 @@ export interface WeeklyReport {
   title: string;
   content: string;
   weekStart: string;
+  weekEnd: string | null;
   submittedAt: string;
 }
 

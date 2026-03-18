@@ -2,7 +2,7 @@ import React from "react";
 import { Plus } from "lucide-react";
 import { ReportStatusTag } from "@/components/reports/ReportStatusTag";
 import type { WeeklyReport } from "@/types/weeklyReport";
-import { fmtWeekRange, fmtDate } from "@/types/weeklyReport";
+import { fmtWeekRange, fmtDate, fmtWeekLabel } from "@/types/weeklyReport";
 
 interface Props {
   reports: WeeklyReport[];
@@ -57,14 +57,24 @@ export function ReportListPanel({ reports, selectedId, onSelect, onNew, loading 
                   ].join(" ")}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-500">
-                      {fmtDate(r.weekStart)} – {r.weekEnd ? fmtDate(r.weekEnd) : "?"}
+                    <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                      {fmtWeekLabel(r.weekStart)}
                     </span>
                     <ReportStatusTag status={r.status} />
                   </div>
                   <p className={`text-sm truncate ${active ? "text-blue-900 font-medium" : "text-gray-800"}`}>
                     {r.title}
                   </p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-xs text-gray-500">
+                      {fmtDate(r.weekStart)} – {r.weekEnd ? fmtDate(r.weekEnd) : "?"}
+                    </span>
+                    {r.submittedAt && (
+                      <span className="text-[10px] text-gray-400">
+                        提交: {new Date(r.submittedAt).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
                 </button>
               );
             })}
