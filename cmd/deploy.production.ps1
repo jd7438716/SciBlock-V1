@@ -13,6 +13,18 @@ if ($raw -match "CHANGE_ME") {
   throw "[deploy:prod] Found CHANGE_ME placeholder in $envFile"
 }
 
+$requiredKeys = @("POSTGRES_PASSWORD", "JWT_SECRET", "ADMIN_SECRET", "CORS_ORIGINS")
+foreach ($key in $requiredKeys) {
+  $line = Get-Content $envFile | Where-Object { $_ -match "^$key=" } | Select-Object -First 1
+  if (-not $line) {
+    throw "[deploy:prod] Missing $key in $envFile"
+  }
+  $value = $line.Split('=', 2)[1]
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    throw "[deploy:prod] Empty $key in $envFile"
+  }
+}
+
 Write-Host "[deploy:prod] Building and starting production stack..."
 docker compose --env-file $envFile -f $composeFile up -d --build --remove-orphans
 

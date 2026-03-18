@@ -17,6 +17,14 @@ if grep -q 'CHANGE_ME' "${ENV_FILE}"; then
   exit 1
 fi
 
+for key in POSTGRES_PASSWORD JWT_SECRET ADMIN_SECRET CORS_ORIGINS; do
+  value="$(grep -E "^${key}=" "${ENV_FILE}" | cut -d= -f2-)"
+  if [ -z "${value}" ]; then
+    echo "[deploy:prod] ${key} is empty in ${ENV_FILE}."
+    exit 1
+  fi
+done
+
 echo "[deploy:prod] Building and starting production stack..."
 docker compose \
   --env-file "${ENV_FILE}" \

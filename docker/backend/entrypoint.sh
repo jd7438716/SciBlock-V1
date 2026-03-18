@@ -89,7 +89,7 @@ require_env DATABASE_URL
 require_env JWT_SECRET
 require_env ADMIN_SECRET
 
-if [ "${DB_REWRITE_LOCALHOST:-true}" = "true" ]; then
+if [ "${DB_REWRITE_LOCALHOST:-false}" = "true" ]; then
   export DATABASE_URL="$(rewrite_localhost_db_url "${DATABASE_URL}")"
   log "DATABASE_URL host rewrite enabled (localhost -> host.docker.internal)"
 else
@@ -109,5 +109,7 @@ run_migrations
 run_seed_if_enabled
 start_go_api "${GO_PORT}"
 
+export PORT="${BACKEND_PORT}"
+export GO_API_URL="${GO_API_URL}"
 log "Starting Express API on :${BACKEND_PORT} (GO_API_URL=${GO_API_URL})"
-exec PORT="${BACKEND_PORT}" GO_API_URL="${GO_API_URL}" node /app/artifacts/api-server/dist/index.cjs
+exec node /app/artifacts/api-server/dist/index.cjs
