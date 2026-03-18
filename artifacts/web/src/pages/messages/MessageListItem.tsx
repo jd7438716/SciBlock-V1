@@ -14,10 +14,13 @@ import { MESSAGE_TYPE_LABELS, MESSAGE_TYPE_COLORS } from "../../types/messages";
 // ---------------------------------------------------------------------------
 
 const TYPE_ICONS: Record<MessageType, React.ElementType> = {
-  invitation:     UserRound,
-  comment:        MessageSquare,
-  share_request:  Share2,
-  report_comment: BookOpen,
+  invitation:         UserRound,
+  comment:            MessageSquare,
+  share_request:      Share2,
+  report_comment:     BookOpen,
+  experiment_shared:  Share2,
+  report_shared:      Share2,
+  share_sent:         Share2,
 };
 
 // ---------------------------------------------------------------------------

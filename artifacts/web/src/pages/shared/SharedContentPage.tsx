@@ -190,19 +190,19 @@ function ReportView({ report }: { report: WeeklyReport }) {
       {aiContent ? (
         <div className="space-y-4">
           {aiContent.summary && <SummaryCard content={aiContent} />}
-          {aiContent.statusDistribution && <StatusCard content={aiContent} />}
+          {aiContent.statusDistribution && <StatusCard dist={aiContent.statusDistribution} />}
           {aiContent.projectSummary && aiContent.projectSummary.length > 0 && (
-            <ProjectSummaryCard content={aiContent} />
+            <ProjectSummaryCard items={aiContent.projectSummary} />
           )}
-          {aiContent.operationSummary && <OperationCard content={aiContent} />}
-          {aiContent.resultTrends && aiContent.resultTrends.length > 0 && (
-            <TrendsCard content={aiContent} />
+          {aiContent.operationSummary && <OperationCard steps={aiContent.operationSummary} />}
+          {aiContent.resultsTrends && aiContent.resultsTrends.length > 0 && (
+            <TrendsCard trends={aiContent.resultsTrends} />
           )}
           {aiContent.parameterChanges && aiContent.parameterChanges.length > 0 && (
-            <ParamCard content={aiContent} />
+            <ParamCard params={aiContent.parameterChanges} />
           )}
           {aiContent.provenanceExperiments && aiContent.provenanceExperiments.length > 0 && (
-            <ProvenanceCard content={aiContent} />
+            <ProvenanceCard experiments={aiContent.provenanceExperiments} />
           )}
         </div>
       ) : report.content ? (
