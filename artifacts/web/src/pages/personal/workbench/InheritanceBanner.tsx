@@ -62,6 +62,11 @@ interface DirtyWarningBannerProps {
   isConfirming: boolean;
   /** Called when the user clicks "立即确认" inside the banner. */
   onConfirm: () => void;
+  /**
+   * True when the current record is the chain head.
+   * Controls whether the banner text mentions chain-level or record-level impact.
+   */
+  isHead: boolean;
 }
 
 /**
@@ -73,12 +78,15 @@ interface DirtyWarningBannerProps {
  *   - The actual confirm() side-effect remains in WorkbenchContext.
  *   - No direct context dependency keeps this component reusable and testable.
  */
-export function DirtyWarningBanner({ isConfirming, onConfirm }: DirtyWarningBannerProps) {
+export function DirtyWarningBanner({ isConfirming, onConfirm, isHead }: DirtyWarningBannerProps) {
+  const bannerText = isHead
+    ? "内容已修改，重新确认后后续新建实验将继承本次参数"
+    : "内容已修改，重新确认以更新本条记录（不影响当前传承链）";
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200">
       <AlertTriangle size={13} className="text-amber-600 flex-shrink-0" />
       <span className="text-xs text-amber-800 font-medium flex-1">
-        内容已修改，需重新确认才能更新继承链
+        {bannerText}
       </span>
       <button
         type="button"

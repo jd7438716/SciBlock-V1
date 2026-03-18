@@ -153,7 +153,11 @@ export function ExperimentHeader() {
           confirmed record and hasn't re-confirmed yet. Provides one-click
           shortcut to re-confirm without scrolling to the button below. */}
       {isPersisted && isDirty && (
-        <DirtyWarningBanner isConfirming={isConfirming} onConfirm={handleConfirm} />
+        <DirtyWarningBanner
+          isConfirming={isConfirming}
+          onConfirm={handleConfirm}
+          isHead={isCurrentRecordHead}
+        />
       )}
 
       <div className="flex flex-col gap-3 px-4 py-3">
