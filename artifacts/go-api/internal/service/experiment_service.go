@@ -9,64 +9,86 @@
 package service
 
 import (
-        "context"
-        "fmt"
+	"context"
+	"fmt"
 
-        "sciblock/go-api/internal/domain"
-        "sciblock/go-api/internal/repository"
+	"sciblock/go-api/internal/domain"
+	"sciblock/go-api/internal/repository"
 )
 
 // ExperimentService handles all business logic for ExperimentRecord.
 type ExperimentService struct {
-        repo     repository.ExperimentRepository
-        sciNotes repository.SciNoteRepository
+	repo     repository.ExperimentRepository
+	sciNotes repository.SciNoteRepository
+	shares   repository.ShareRepository
 }
 
 // NewExperimentService creates an ExperimentService with its required dependencies.
-func NewExperimentService(repo repository.ExperimentRepository, sciNotes repository.SciNoteRepository) *ExperimentService {
-        return &ExperimentService{repo: repo, sciNotes: sciNotes}
+func NewExperimentService(
+	repo repository.ExperimentRepository,
+	sciNotes repository.SciNoteRepository,
+	shares repository.ShareRepository,
+) *ExperimentService {
+	return &ExperimentService{repo: repo, sciNotes: sciNotes, shares: shares}
 }
 
 // List returns all ExperimentRecords for a SciNote owned by callerUserID.
 // When trashOnly is true, only soft-deleted records are returned (trash view).
 func (s *ExperimentService) List(ctx context.Context, sciNoteID, callerUserID string, trashOnly bool) ([]domain.ExperimentRecord, error) {
-        note, err := s.sciNotes.GetByID(ctx, sciNoteID)
-        if err != nil {
-                return nil, fmt.Errorf("get scinote: %w", err)
-        }
-        if note == nil {
-                return nil, ErrNotFound
-        }
-        if note.UserID != callerUserID {
-                return nil, ErrForbidden
-        }
+	note, err := s.sciNotes.GetByID(ctx, sciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("get scinote: %w", err)
+	}
+	if note == nil {
+		return nil, ErrNotFound
+	}
+	if note.UserID != callerUserID {
+		return nil, ErrForbidden
+	}
 
-        records, err := s.repo.ListBySciNote(ctx, sciNoteID, trashOnly)
-        if err != nil {
-                return nil, fmt.Errorf("list experiments: %w", err)
-        }
-        return records, nil
+	records, err := s.repo.ListBySciNote(ctx, sciNoteID, trashOnly)
+	if err != nil {
+		return nil, fmt.Errorf("list experiments: %w", err)
+	}
+	return records, nil
 }
 
-// Get retrieves a single ExperimentRecord by ID, verifying the caller owns the parent SciNote.
+// Get retrieves a single ExperimentRecord by ID.
+//
+// Access is granted when either:
+//  1. The caller owns the parent SciNote (normal ownership path), or
+//  2. The caller has been granted read access via a share record.
+//
+// Mutating operations (Update, SoftDelete, Restore) always require ownership.
 func (s *ExperimentService) Get(ctx context.Context, id, callerUserID string) (*domain.ExperimentRecord, error) {
-        rec, err := s.repo.GetByID(ctx, id)
-        if err != nil {
-                return nil, fmt.Errorf("get experiment: %w", err)
-        }
-        if rec == nil {
-                return nil, ErrNotFound
-        }
+	rec, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get experiment: %w", err)
+	}
+	if rec == nil {
+		return nil, ErrNotFound
+	}
 
-        note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
-        if err != nil {
-                return nil, fmt.Errorf("get parent scinote: %w", err)
-        }
-        if note == nil || note.UserID != callerUserID {
-                return nil, ErrForbidden
-        }
+	note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("get parent scinote: %w", err)
+	}
 
-        return rec, nil
+	// Primary path: caller is the SciNote owner.
+	if note != nil && note.UserID == callerUserID {
+		return rec, nil
+	}
+
+	// Fallback: caller has been granted access via a share record.
+	ok, err := s.shares.HasShareAccess(ctx, id, callerUserID)
+	if err != nil {
+		return nil, fmt.Errorf("check share access: %w", err)
+	}
+	if ok {
+		return rec, nil
+	}
+
+	return nil, ErrForbidden
 }
 
 // Create inserts a new ExperimentRecord under sciNoteID.
@@ -74,100 +96,133 @@ func (s *ExperimentService) Get(ctx context.Context, id, callerUserID string) (*
 //   - ExperimentStatus defaults to domain.StatusExploring when not provided.
 //   - Tags nil is normalized to an empty slice.
 func (s *ExperimentService) Create(ctx context.Context, sciNoteID string, input domain.ExperimentRecord, callerUserID string) (*domain.ExperimentRecord, error) {
-        note, err := s.sciNotes.GetByID(ctx, sciNoteID)
-        if err != nil {
-                return nil, fmt.Errorf("get scinote: %w", err)
-        }
-        if note == nil {
-                return nil, ErrNotFound
-        }
-        if note.UserID != callerUserID {
-                return nil, ErrForbidden
-        }
+	note, err := s.sciNotes.GetByID(ctx, sciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("get scinote: %w", err)
+	}
+	if note == nil {
+		return nil, ErrNotFound
+	}
+	if note.UserID != callerUserID {
+		return nil, ErrForbidden
+	}
 
-        // Apply business defaults.
-        if input.ExperimentStatus == "" {
-                input.ExperimentStatus = domain.StatusExploring
-        }
-        if input.Tags == nil {
-                input.Tags = []string{}
-        }
-        input.SciNoteID = sciNoteID
+	// Apply business defaults.
+	if input.ExperimentStatus == "" {
+		input.ExperimentStatus = domain.StatusExploring
+	}
+	if input.Tags == nil {
+		input.Tags = []string{}
+	}
+	input.SciNoteID = sciNoteID
 
-        created, err := s.repo.Create(ctx, input)
-        if err != nil {
-                return nil, fmt.Errorf("create experiment: %w", err)
-        }
-        return created, nil
+	created, err := s.repo.Create(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("create experiment: %w", err)
+	}
+	return created, nil
 }
 
 // Update applies a partial patch to an ExperimentRecord, verifying ownership.
 // Only non-nil fields in the patch are written to the database.
+//
+// Note: Update intentionally does NOT fall back to share access — recipients
+// may only read shared content, not modify it.
 func (s *ExperimentService) Update(ctx context.Context, id string, patch domain.ExperimentPatch, callerUserID string) (*domain.ExperimentRecord, error) {
-        if _, err := s.Get(ctx, id, callerUserID); err != nil {
-                return nil, err
-        }
-        updated, err := s.repo.Update(ctx, id, patch)
-        if err != nil {
-                return nil, fmt.Errorf("update experiment: %w", err)
-        }
-        return updated, nil
+	rec, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get experiment: %w", err)
+	}
+	if rec == nil {
+		return nil, ErrNotFound
+	}
+
+	note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("get parent scinote: %w", err)
+	}
+	if note == nil || note.UserID != callerUserID {
+		return nil, ErrForbidden
+	}
+
+	updated, err := s.repo.Update(ctx, id, patch)
+	if err != nil {
+		return nil, fmt.Errorf("update experiment: %w", err)
+	}
+	return updated, nil
 }
 
 // SoftDelete moves an ExperimentRecord to the trash (sets is_deleted=true).
+// Requires ownership — share access is insufficient for destructive actions.
 func (s *ExperimentService) SoftDelete(ctx context.Context, id, callerUserID string) error {
-        if _, err := s.Get(ctx, id, callerUserID); err != nil {
-                return err
-        }
-        if err := s.repo.SoftDelete(ctx, id); err != nil {
-                return fmt.Errorf("soft delete experiment: %w", err)
-        }
-        return nil
+	rec, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("get experiment: %w", err)
+	}
+	if rec == nil {
+		return ErrNotFound
+	}
+
+	note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
+	if err != nil {
+		return fmt.Errorf("get parent scinote: %w", err)
+	}
+	if note == nil || note.UserID != callerUserID {
+		return ErrForbidden
+	}
+
+	if err := s.repo.SoftDelete(ctx, id); err != nil {
+		return fmt.Errorf("soft delete experiment: %w", err)
+	}
+	return nil
 }
 
 // ListRecent returns the N most recently updated active experiment records
 // across all SciNotes owned by callerUserID.
 // limit is clamped to [1, 50] by the handler before reaching here.
 func (s *ExperimentService) ListRecent(ctx context.Context, callerUserID string, limit int) ([]domain.RecentExperimentRow, error) {
-        rows, err := s.repo.ListRecentByUser(ctx, callerUserID, limit)
-        if err != nil {
-                return nil, fmt.Errorf("list recent experiments: %w", err)
-        }
-        return rows, nil
+	rows, err := s.repo.ListRecentByUser(ctx, callerUserID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list recent experiments: %w", err)
+	}
+	return rows, nil
 }
 
 // Restore recovers a soft-deleted ExperimentRecord (sets is_deleted=false).
 // Returns ErrForbidden when the parent SciNote is itself soft-deleted,
 // because restoring an experiment under a deleted container is semantically ambiguous.
+// Requires ownership — share access is insufficient for restore operations.
 func (s *ExperimentService) Restore(ctx context.Context, id, callerUserID string) (*domain.ExperimentRecord, error) {
-        rec, err := s.repo.GetByID(ctx, id)
-        if err != nil {
-                return nil, fmt.Errorf("get experiment for restore: %w", err)
-        }
-        if rec == nil {
-                return nil, ErrNotFound
-        }
+	rec, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get experiment for restore: %w", err)
+	}
+	if rec == nil {
+		return nil, ErrNotFound
+	}
 
-        note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
-        if err != nil {
-                return nil, fmt.Errorf("get parent scinote for restore: %w", err)
-        }
-        if note == nil || note.UserID != callerUserID {
-                return nil, ErrForbidden
-        }
-        if note.IsDeleted {
-                return nil, fmt.Errorf("%w: parent SciNote is deleted; restore the SciNote first", ErrForbidden)
-        }
+	note, err := s.sciNotes.GetByID(ctx, rec.SciNoteID)
+	if err != nil {
+		return nil, fmt.Errorf("get parent scinote for restore: %w", err)
+	}
+	if note == nil || note.UserID != callerUserID {
+		return nil, ErrForbidden
+	}
+	if note.IsDeleted {
+		return nil, fmt.Errorf("%w: parent SciNote is deleted; restore the SciNote first", ErrForbidden)
+	}
 
-        if err := s.repo.Restore(ctx, id); err != nil {
-                return nil, fmt.Errorf("restore experiment: %w", err)
-        }
-        return s.Get(ctx, id, callerUserID)
+	if err := s.repo.Restore(ctx, id); err != nil {
+		return nil, fmt.Errorf("restore experiment: %w", err)
+	}
+
+	// Re-fetch via Get to verify and return the restored record.
+	return s.Get(ctx, id, callerUserID)
 }
 
 // CountBySciNoteIDs returns a map[sciNoteID]count of non-deleted experiment records
 // for the supplied SciNote IDs.  No ownership check is performed — callers (e.g.
 // the instructor handler) are responsible for verifying access before calling this.
 func (s *ExperimentService) CountBySciNoteIDs(ctx context.Context, ids []string) (map[string]int, error) {
-        return s.repo.CountBySciNoteIDs(ctx, ids)
+	return s.repo.CountBySciNoteIDs(ctx, ids)
 }

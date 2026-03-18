@@ -34,6 +34,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { requireInstructor } from "../middleware/requireAuth";
 import { getStudentByUserId } from "../services/student.service";
+import { hasShareAccess } from "../repositories/share.repository";
 import { submitReport, reviewReport } from "../services/report.service";
 import { runReportGeneration } from "../services/report-generation.service";
 import {
@@ -244,16 +245,38 @@ router.get("/preview", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
+  const callerId = res.locals.userId as string;
+  const callerRole = res.locals.role as string;
+
   try {
     const [report] = await db
       .select()
       .from(weeklyReportsTable)
       .where(eq(weeklyReportsTable.id, id))
       .limit(1);
+
     if (!report) {
       res.status(404).json({ message: "Report not found" });
       return;
     }
+
+    // Access control:
+    //   - Instructors can see all reports.
+    //   - The report's own student can see their report (checked via student binding).
+    //   - Any user with a valid share record for this report can see it.
+    if (callerRole !== "instructor") {
+      const student = await getStudentByUserId(callerId);
+      const isOwner = student && student.id === report.studentId;
+
+      if (!isOwner) {
+        const isSharedWithCaller = await hasShareAccess("weekly_report", id, callerId);
+        if (!isSharedWithCaller) {
+          res.status(403).json({ error: "forbidden", message: "无权限查看此报告。" });
+          return;
+        }
+      }
+    }
+
     res.json(report);
   } catch (err) {
     console.error("[reports] GET /:id error:", err);

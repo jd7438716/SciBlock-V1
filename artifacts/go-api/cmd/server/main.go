@@ -76,10 +76,11 @@ func main() {
         userRepo := repository.NewUserRepository(pool)
         sciNoteRepo := repository.NewSciNoteRepository(pool)
         experimentRepo := repository.NewExperimentRepository(pool)
+        shareRepo := repository.NewShareRepository(pool)
 
         authSvc := service.NewAuthService(userRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
         sciNoteSvc := service.NewSciNoteService(sciNoteRepo)
-        experimentSvc := service.NewExperimentService(experimentRepo, sciNoteRepo)
+        experimentSvc := service.NewExperimentService(experimentRepo, sciNoteRepo, shareRepo)
 
         authH := handler.NewAuthHandler(authSvc)
         sciNoteH := handler.NewSciNoteHandler(sciNoteSvc)

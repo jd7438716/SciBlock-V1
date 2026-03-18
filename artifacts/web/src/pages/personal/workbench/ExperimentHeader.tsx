@@ -1,9 +1,14 @@
 import React, { useState, useRef } from "react";
 import { Pencil, Sparkles, X } from "lucide-react";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
+import { useCurrentUser } from "@/contexts/UserContext";
 import { useAiTitleAssist } from "@/hooks/useAiTitleAssist";
+import { useShares } from "@/hooks/useShares";
 import { ExperimentTitleAssist } from "./ExperimentTitleAssist";
 import { StatusPicker } from "./StatusPicker";
+import { ShareButton } from "@/components/share/ShareButton";
+import { SharedWithAvatars } from "@/components/share/SharedWithAvatars";
+import { ShareModal } from "@/components/share/ShareModal";
 
 /**
  * ExperimentHeader — top section of the OntologyPanel.
@@ -13,6 +18,7 @@ import { StatusPicker } from "./StatusPicker";
  *   - StatusPicker (colored badge dropdown)
  *   - Experiment code input
  *   - Tag input area with add/remove
+ *   - Share button + shared-with avatars (owner-only, persisted records only)
  *
  * Note: the "+ 新建记录" button has moved to RecordSwitcher.
  */
@@ -26,11 +32,33 @@ export function ExperimentHeader() {
     removeTag,
   } = useWorkbench();
 
+  const { currentUser } = useCurrentUser();
   const assist = useAiTitleAssist();
 
   const [tagInput, setTagInput] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+
+  // Only share records that have been persisted to the server (real UUID, not temp "rec_…" id).
+  const isPersisted = currentRecord.id.length > 10 && !currentRecord.id.startsWith("rec_");
+  const isOwner = !!currentUser; // workbench only renders for the owner
+
+  const shares = useShares(
+    isPersisted
+      ? {
+          resourceType: "experiment_record",
+          resourceId: currentRecord.id,
+          resourceTitle: currentRecord.title,
+          ownerId: currentUser?.id ?? "",
+        }
+      : {
+          resourceType: "experiment_record",
+          resourceId: "",
+          resourceTitle: "",
+          ownerId: "",
+        }
+  );
 
   function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" || e.key === ",") {
@@ -161,6 +189,30 @@ export function ExperimentHeader() {
           </button>
         )}
       </div>
+
+      {/* Row 4: Share controls — only shown for persisted records */}
+      {isPersisted && isOwner && (
+        <div className="flex items-center gap-2 pt-0.5">
+          <ShareButton
+            recipientCount={shares.recipients.length}
+            onClick={() => setShareOpen(true)}
+          />
+          {shares.recipients.length > 0 && (
+            <SharedWithAvatars recipients={shares.recipients} />
+          )}
+        </div>
+      )}
+
+      {/* Share modal */}
+      {shareOpen && (
+        <ShareModal
+          resourceTitle={currentRecord.title || "此实验记录"}
+          recipients={shares.recipients}
+          onAdd={shares.addShare}
+          onRemove={shares.removeShare}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

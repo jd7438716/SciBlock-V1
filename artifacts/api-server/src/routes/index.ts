@@ -8,6 +8,7 @@ import messagesRouter from "./messages";
 import teamRouter from "./team";
 import reportsRouter from "./reports";
 import usersRouter from "./users";
+import sharesRouter from "./shares";
 
 const router: IRouter = Router();
 
@@ -23,5 +24,6 @@ router.use("/messages", requireAuth, messagesRouter);
 router.use("/team",     requireAuth, teamRouter);
 router.use("/reports",  requireAuth, reportsRouter);
 router.use("/users",    requireAuth, usersRouter);
+router.use("/shares",   requireAuth, sharesRouter);
 
 export default router;

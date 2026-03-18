@@ -20,6 +20,7 @@ import { ExperimentWorkbenchPage } from "@/pages/personal/workbench/ExperimentWo
 import { TrashPage } from "@/pages/personal/trash/TrashPage";
 import { MyReportsPage } from "@/pages/personal/reports/MyReportsPage";
 import { TeamReportsPage } from "@/pages/team/reports/TeamReportsPage";
+import { SharedContentPage } from "@/pages/shared/SharedContentPage";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +77,8 @@ function Router() {
       {/* Public routes — no sidebar */}
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={RequestAccessPage} />
+      {/* Shared content viewer — read-only, no sidebar, requires auth */}
+      <Route path="/shared/:shareId" component={SharedContentPage} />
       {/* All other routes get the authenticated shell */}
       <Route>
         <AuthenticatedRouter />

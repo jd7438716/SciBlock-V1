@@ -16,6 +16,8 @@ import { InvitationDetail } from "./detail/InvitationDetail";
 import { CommentDetail } from "./detail/CommentDetail";
 import { ShareRequestDetail } from "./detail/ShareRequestDetail";
 import { ReportCommentDetail } from "./detail/ReportCommentDetail";
+import { ReceivedShareDetail } from "./detail/ReceivedShareDetail";
+import { ShareSentDetail } from "./detail/ShareSentDetail";
 
 // ---------------------------------------------------------------------------
 // Empty state
@@ -96,6 +98,12 @@ export function MessageDetail() {
         )}
         {message.type === "report_comment" && (
           <ReportCommentDetail message={message} />
+        )}
+        {(message.type === "experiment_shared" || message.type === "report_shared") && (
+          <ReceivedShareDetail message={message} />
+        )}
+        {message.type === "share_sent" && (
+          <ShareSentDetail message={message} />
         )}
       </div>
     </div>

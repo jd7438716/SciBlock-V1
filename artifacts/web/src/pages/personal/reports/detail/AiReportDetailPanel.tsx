@@ -15,6 +15,7 @@
  *   • 导师评论区
  */
 
+import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { CommentThread } from "@/components/reports/CommentThread";
 import { ReportStatusTag } from "@/components/reports/ReportStatusTag";
@@ -30,6 +31,10 @@ import {
 } from "@/components/reports/AiReportSections";
 import type { WeeklyReport, AiReportContent } from "@/types/weeklyReport";
 import { parseAiContent, fmtDate } from "@/types/weeklyReport";
+import { useShares } from "@/hooks/useShares";
+import { ShareButton } from "@/components/share/ShareButton";
+import { SharedWithAvatars } from "@/components/share/SharedWithAvatars";
+import { ShareModal } from "@/components/share/ShareModal";
 
 interface Props {
   report: WeeklyReport;
@@ -42,6 +47,7 @@ interface Props {
 
 export function AiReportDetailPanel({ report, userId, studentName, onDelete, onSubmit }: Props) {
   const content: AiReportContent | null = parseAiContent(report);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const dateLabel =
     report.dateRangeStart && report.dateRangeEnd
@@ -54,6 +60,13 @@ export function AiReportDetailPanel({ report, userId, studentName, onDelete, onS
     if (!confirm(`确认删除「${report.title}」？此操作不可撤销。`)) return;
     await onDelete(report.id);
   };
+
+  const shares = useShares({
+    resourceType: "weekly_report",
+    resourceId: report.id,
+    resourceTitle: report.title,
+    ownerId: userId,
+  });
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
@@ -74,6 +87,17 @@ export function AiReportDetailPanel({ report, userId, studentName, onDelete, onS
                   <span className="text-xs text-gray-300">·</span>
                   <span className="text-xs text-gray-500">{report.experimentCount} 条实验</span>
                 </>
+              )}
+            </div>
+
+            {/* Share controls */}
+            <div className="flex items-center gap-2 mt-3">
+              <ShareButton
+                recipientCount={shares.recipients.length}
+                onClick={() => setShareOpen(true)}
+              />
+              {shares.recipients.length > 0 && (
+                <SharedWithAvatars recipients={shares.recipients} />
               )}
             </div>
           </div>
@@ -132,6 +156,17 @@ export function AiReportDetailPanel({ report, userId, studentName, onDelete, onS
         </div>
 
       </div>
+
+      {/* Share modal */}
+      {shareOpen && (
+        <ShareModal
+          resourceTitle={report.title || "此周报"}
+          recipients={shares.recipients}
+          onAdd={shares.addShare}
+          onRemove={shares.removeShare}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   );
 }

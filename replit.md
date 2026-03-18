@@ -7,7 +7,7 @@ Key capabilities:
 - Creation and management of "SciNotes" (experiment notebooks) via a 6-step wizard.
 - A 3-panel experiment workbench (Ontology, Editor, Utility) with TipTap rich-text, module-level editing, and AI report generation.
 - Team member management: invite students, student card grid, per-student detail page with dual-column layout (SciNote experiments OR weekly report detail in right panel).
-- Messaging inbox: invitation, comment, and share-request notifications.
+- Messaging inbox: invitation, comment, share-request notifications, and share delivery (experiment_shared, report_shared, share_sent types).
 - Weekly report system: student creation/submission + AI auto-summary (自动汇总) with 3-step wizard; instructor review workflow with atomic status update (POST /reports/:id/review) and automatic message notifications to students (types: report_reviewed, report_needs_revision, report_comment).
 - AI Weekly Report module: rule-based experiment aggregation (no LLM marketing language), structured AiReportContent with statusDistribution, projectSummary, operationSummary, resultsTrends, parameterChanges, provenanceExperiments sections.
 - AI chat integration (Aliyun DashScope / OpenAI).
@@ -27,7 +27,10 @@ The project is a pnpm monorepo with `artifacts/` (deployable services) and `lib/
 - **Routing**: Wouter
 - **State**: React Context (`SciNoteStoreContext`, `UserContext`, `TrashContext`, etc.)
 - **UI**: shadcn/ui primitives + Tailwind CSS
-- **API client**: `src/api/` — `client.ts` (apiFetch + token helpers), `auth.ts`, `scinotes.ts`, `experiments.ts`, `weeklyReport.ts` (report CRUD + submit)
+- **API client**: `src/api/` — `client.ts` (apiFetch + token helpers), `auth.ts`, `scinotes.ts`, `experiments.ts`, `weeklyReport.ts` (report CRUD + submit), `shares.ts` (fetchShareRecipients, createShare, revokeShare, searchUsers)
+- **Share UI**: `components/share/` — `ShareButton` (分享 button with count badge), `ShareModal` (user search + add + revoke), `SharedWithAvatars` (recipient avatar row with popover), `UserInfoPopover`; `hooks/useShares.ts` (auto-load on mount, addShare, removeShare); integrated into `ExperimentHeader` (Row 4 for persisted records) and `AiReportDetailPanel` (below date row)
+- **SharedContentPage**: `/shared/:shareId` route (outside AuthenticatedLayout) — validates share via API, fetches experiment or report, renders read-only with SharedFromBanner context strip
+- **Message detail dispatch**: `MessageDetail.tsx` routes `experiment_shared`/`report_shared` → `ReceivedShareDetail`, `share_sent` → `ShareSentDetail`
 - **Report component tree**:
   - `components/reports/AiReportSections.tsx` — pure presentation: SectionCard, SummaryCard, StatusCard, ProjectSummaryCard, OperationCard, TrendsCard, ParamCard, ProvenanceCard (no data fetching)
   - `components/reports/ReportSubmitAction.tsx` — submit/status banner (draft→submit, needs_revision→resubmit, submitted→confirmation)
@@ -68,7 +71,8 @@ The project is a pnpm monorepo with `artifacts/` (deployable services) and `lib/
   - `POST /api/auth/logout`→ Go
   - `/api/scinotes/*`      → Go (SciNote CRUD)
   - `/api/experiments/*`   → Go (ExperimentRecord CRUD)
-- **Owns tables**: `users` (shared), `students`, `papers`, `weekly_reports`, `report_comments`, `messages`
+- **Owns tables**: `users` (shared), `students`, `papers`, `weekly_reports`, `report_comments`, `messages`, `shares`
+- **Share system**: `shares` table (shareId, resourceType, resourceId, resourceTitle, ownerId, recipientId, createdAt, revokedAt); `share.repository.ts` + `share.service.ts`; routes: `GET /api/shares` (list recipients), `POST /api/shares` (create + auto-create 2 messages), `DELETE /api/shares/:id` (revoke), `GET /api/users/search?q=` (user lookup); SharedContentPage (`/shared/:shareId`) validates access before rendering read-only experiment or report
 - **Key middleware**: `requireAuth` (JWT → res.locals), `requireInstructor` (role guard, placed after requireAuth)
 - **Student identity resolution**: `GET /api/users/me/student` → returns student profile bound to current user's account; `GET /api/reports` role-branches on `res.locals.role`: students get their own reports via JWT→userId→studentId lookup; instructors accept optional `?studentId=` param
 - **`students.user_id`**: nullable text, unique; links `users.id` → `students.user_id`; seed binding: `demo@sciblock.com` → 李婷 (set via SQL). TRANSITION: populated via seed/admin SQL; long-term should use Drizzle migration files.
