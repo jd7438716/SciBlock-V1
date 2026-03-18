@@ -21,6 +21,7 @@ import React from "react";
 import { CheckCircle2, Pencil } from "lucide-react";
 import type { OntologyModule } from "@/types/workbench";
 import type { OntologyModuleStructuredData } from "@/types/ontologyModules";
+import { FLOW_TRIGGER_KEYS } from "@/types/workbench";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
 import { ModuleBodyRenderer } from "./modules/shared/ModuleBodyRenderer";
 
@@ -33,10 +34,25 @@ interface Props {
 }
 
 export function OntologyModuleEditor({ module }: Props) {
-  const { updateModuleStructuredData, setModuleStatus } = useWorkbench();
+  const {
+    updateModuleStructuredData,
+    setModuleStatus,
+    currentRecord,
+    isCurrentRecordHead,
+  } = useWorkbench();
 
   const isConfirmed = module.status === "confirmed";
   const isInherited = module.status === "inherited";
+
+  // Show the heritable-module hint when:
+  //  1. This module is one of the four heritable modules (not "data").
+  //  2. The record has been confirmed at least once (confirmed or confirmed_dirty).
+  // The hint tells the user that editing will push the record back to "待重新确认".
+  const isHeritableModule = (FLOW_TRIGGER_KEYS as readonly string[]).includes(module.key);
+  const recordIsConfirmedState =
+    currentRecord.confirmationState === "confirmed" ||
+    currentRecord.confirmationState === "confirmed_dirty";
+  const showHeritableHint = isHeritableModule && recordIsConfirmedState;
 
   /**
    * Incremental write: merges patch into current structuredData, then
@@ -67,11 +83,26 @@ export function OntologyModuleEditor({ module }: Props) {
       {/* Header — module title + status annotation                           */}
       {/* ------------------------------------------------------------------ */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-white flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-semibold text-gray-800">{module.title}</h3>
-          {module.isHighlighted && (
-            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-              AI 关联
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-800">{module.title}</h3>
+            {module.isHighlighted && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                AI 关联
+              </span>
+            )}
+          </div>
+          {/* Heritable-module hint: appears only for confirmed/confirmed_dirty records */}
+          {showHeritableHint && (
+            <span
+              title={
+                isCurrentRecordHead
+                  ? "此模块的修改将影响后续实验记录的默认参数（需重新确认）"
+                  : "此模块的修改不影响传承链（需重新确认本条记录）"
+              }
+              className="text-[10px] text-amber-600 leading-none"
+            >
+              修改后将进入待重新确认状态
             </span>
           )}
         </div>

@@ -4,6 +4,7 @@ import { useWorkbench } from "@/contexts/WorkbenchContext";
 import { useCurrentUser } from "@/contexts/UserContext";
 import { useAiTitleAssist } from "@/hooks/useAiTitleAssist";
 import { useShares } from "@/hooks/useShares";
+import { useToast } from "@/hooks/use-toast";
 import { ExperimentTitleAssist } from "./ExperimentTitleAssist";
 import { StatusPicker } from "./StatusPicker";
 import {
@@ -31,6 +32,7 @@ import { ShareModal } from "@/components/share/ShareModal";
 export function ExperimentHeader() {
   const {
     currentRecord,
+    isCurrentRecordHead,
     updateTitle,
     updateStatus,
     updateExperimentCode,
@@ -40,6 +42,7 @@ export function ExperimentHeader() {
   } = useWorkbench();
 
   const { currentUser } = useCurrentUser();
+  const { toast } = useToast();
   const assist = useAiTitleAssist();
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -94,9 +97,24 @@ export function ExperimentHeader() {
 
   async function handleConfirm() {
     if (isConfirming) return;
+    // Capture head status before the API call — isCurrentRecordHead will
+    // re-compute after records update, but we need the pre-call value for
+    // the toast message.
+    const wasHead = isCurrentRecordHead;
     setIsConfirming(true);
     try {
       await confirmRecord();
+      if (wasHead) {
+        toast({
+          title: "传承链已更新",
+          description: "后续实验将继承新的参数。",
+        });
+      } else {
+        toast({
+          title: "记录已更新",
+          description: "传承链不受影响。",
+        });
+      }
     } finally {
       setIsConfirming(false);
     }
@@ -105,12 +123,21 @@ export function ExperimentHeader() {
   // Derived UI state from the authoritative confirmationState value.
   const isDirty = currentRecord.confirmationState === "confirmed_dirty";
   const isConfirmed = currentRecord.confirmationState === "confirmed";
+  const isInConfirmedState = isConfirmed || isDirty;
 
   const confirmButtonLabel = (() => {
     if (isConfirming) return "确认中…";
     if (isConfirmed) return "已确认保存";
     if (isDirty) return "重新确认";
     return "确认保存";
+  })();
+
+  // Tooltip clarifies chain impact only for confirmed/confirmed_dirty records.
+  const confirmButtonTooltip = (() => {
+    if (!isInConfirmedState) return "确认保存，固定本条记录的实验内容";
+    if (isCurrentRecordHead)
+      return "确认后，后续新建实验记录将以此为默认参数";
+    return "仅更新此条记录的确认内容，不影响当前传承链";
   })();
 
   // Confirmed (clean) → disable; dirty or draft → enabled.
@@ -197,6 +224,25 @@ export function ExperimentHeader() {
             </span>
           )}
 
+          {/* Chain-position badge: visible only for confirmed/confirmed_dirty records */}
+          {isPersisted && isInConfirmedState && (
+            isCurrentRecordHead ? (
+              <span
+                title="此记录是当前传承链的起点，再次确认将更新后续记录的默认参数"
+                className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200 cursor-default"
+              >
+                当前传承起点
+              </span>
+            ) : (
+              <span
+                title="此记录已从传承链中被更新的版本取代，再次确认不影响传承链"
+                className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200 cursor-default"
+              >
+                历史记录
+              </span>
+            )
+          )}
+
           {isPersisted && <ConfirmationStateBadge record={currentRecord} />}
 
           {canShare && shares.recipients.length > 0 && (
@@ -264,6 +310,7 @@ export function ExperimentHeader() {
               )}
               <button
                 type="button"
+                title={confirmButtonTooltip}
                 onClick={handleConfirm}
                 disabled={confirmButtonDisabled}
                 className={[

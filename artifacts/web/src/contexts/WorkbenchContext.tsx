@@ -5,6 +5,7 @@ import React, {
   useRef,
   useCallback,
   useEffect,
+  useMemo,
 } from "react";
 import type {
   OntologyModule,
@@ -129,6 +130,15 @@ interface WorkbenchContextValue {
   savePurposeInput: (v: string) => void;
 
   // AI Report
+  /**
+   * True when the current record is the chain head:
+   *  - its confirmationState is "confirmed" or "confirmed_dirty" AND
+   *  - its sequenceNumber is the highest among all confirmed/confirmed_dirty
+   *    records in this SciNote.
+   * Always false for draft records.
+   */
+  isCurrentRecordHead: boolean;
+
   /** Derived from isGeneratingReport + currentRecord.reportHtml */
   reportStatus: ReportStatus;
   /** Manually trigger report generation (e.g. after partial confirm or retry). */
@@ -774,6 +784,25 @@ export function WorkbenchProvider({
   }
 
   // ---------------------------------------------------------------------------
+  // Derived: chain-head status
+  // ---------------------------------------------------------------------------
+
+  /**
+   * The current record is the chain head when it is confirmed/confirmed_dirty
+   * AND has the highest sequenceNumber among all confirmed/confirmed_dirty
+   * records.  Draft records are never the chain head.
+   */
+  const isCurrentRecordHead = useMemo(() => {
+    if (currentRecord.confirmationState === "draft") return false;
+    const confirmedSeqs = records
+      .filter((r) => r.confirmationState !== "draft")
+      .map((r) => r.sequenceNumber);
+    if (confirmedSeqs.length === 0) return false;
+    const chainHeadSeq = Math.max(...confirmedSeqs);
+    return currentRecord.sequenceNumber === chainHeadSeq;
+  }, [records, currentRecord]);
+
+  // ---------------------------------------------------------------------------
   // Context value
   // ---------------------------------------------------------------------------
 
@@ -807,6 +836,7 @@ export function WorkbenchProvider({
     unregisterEditorInsert,
     insertIntoEditor,
     savePurposeInput,
+    isCurrentRecordHead,
     reportStatus,
     triggerReportGeneration,
     updateReport,
