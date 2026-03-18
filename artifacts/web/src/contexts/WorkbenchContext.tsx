@@ -197,6 +197,10 @@ export function WorkbenchProvider({
 
   const [ontologyVersions] = useState<OntologyVersion[]>(SEED_ONTOLOGY_VERSIONS);
 
+  // Keep wizard-derived modules available after initial render.
+  // Used by createNewRecord to seed the FIRST experiment record with real data.
+  const initialModulesRef = useRef<OntologyModule[] | undefined>(initialModules);
+
   /**
    * Initialise the records list with THREE-tier priority:
    *
@@ -437,9 +441,17 @@ export function WorkbenchProvider({
   }
 
   function createNewRecord() {
-    const latestVersion =
-      ontologyVersions[ontologyVersions.length - 1] ?? DEFAULT_ONTOLOGY_VERSION;
-    const localRecord = createExperimentRecord(sciNoteId, latestVersion, records.length + 1);
+    // Determine which modules to seed the local temp record with.
+    // - First record (records.length === 0): use wizard-derived initialModules so the
+    //   user sees real content immediately while the POST is in flight.
+    // - Subsequent records: show empty locally; the server will apply inheritance and
+    //   the response will replace the temp record with the correct inherited modules.
+    const isFirstRecord = records.length === 0;
+    const seedModules: OntologyModule[] = isFirstRecord && initialModulesRef.current
+      ? initialModulesRef.current
+      : [];
+
+    const localRecord = createExperimentRecordWithModules(sciNoteId, seedModules, records.length + 1);
 
     // Add locally with temp ID for instant feedback
     setRecords((prev) => [...prev, localRecord]);
@@ -449,14 +461,18 @@ export function WorkbenchProvider({
 
     // POST to API async; replace the entire local record with the server response
     // so inherited modules from the inheritance chain are applied correctly.
-    // Use a fallback title because Go requires a non-empty title field.
+    //
+    // For the first record: send the wizard modules as currentModules so the server
+    // stores them as scinotes.initial_modules (the inheritance chain bootstrap).
+    // For subsequent records: send empty [] so the server applies its own inheritance
+    // logic (current_confirmed_modules → initial_modules) without mock data interference.
     createExperiment(sciNoteId, {
       title: localRecord.title || "未命名实验",
       purposeInput: localRecord.purposeInput,
       experimentStatus: localRecord.experimentStatus,
       experimentCode: localRecord.experimentCode,
       tags: localRecord.tags,
-      currentModules: localRecord.currentModules,
+      currentModules: seedModules,
       inheritedVersionId: localRecord.inheritedOntologyVersionId,
     })
       .then((serverRecord) => {
