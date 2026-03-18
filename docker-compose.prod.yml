@@ -1,9 +1,9 @@
 # SciBlock 生产环境 Docker Compose 配置
-# 使用方法：docker-compose -f docker-compose.prod.yml up -d
+# 使用方法：docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # 此配置关闭内部 API 服务的端口暴露，避免端口冲突：
 # - go-api (8082) 和 api-server (8080) 仅通过 Docker 内部网络访问
-# - 只对外开放 web 服务的 3012 端口
+# - web 保持 3012 端口（与开发环境一致）
 
 version: '3.8'
 
@@ -17,5 +17,5 @@ services:
     ports: []
 
   web:
-    ports:
-      - "3012:80"
+    # 端口已在 docker-compose.yml 中配置为 3012
+    # 生产环境保持不变
