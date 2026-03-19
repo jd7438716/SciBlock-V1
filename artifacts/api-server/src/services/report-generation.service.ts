@@ -306,30 +306,30 @@ export function buildAiContent(experiments: ExperimentRow[]): AiReportContent {
 }
 
 // ---------------------------------------------------------------------------
-// runReportGeneration — async pipeline (called after 202 is sent)
+// fetchExperimentsForGeneration — experiment query strategy
 //
-// Parameters:
-//   reportId     — the weekly_reports row to update
-//   sciNoteUserId — user_id that owns the scinotes (may differ from the
-//                   instructor who triggered generation)
-//   dateRangeStart / dateRangeEnd — inclusive date bounds for experiment query
+// Priority 1: If the report has explicitly linked records (junction table),
+//             use those. This is the primary path after the linkage feature.
+// Priority 2: Fall back to date-range query (created_at BETWEEN ...) for
+//             backward-compat and reports with no links set.
 // ---------------------------------------------------------------------------
 
-/**
- * Executes the full generation pipeline asynchronously.
- *
- * Must be invoked via `setImmediate` from the route handler so it runs
- * after the HTTP 202 response has been flushed. It is self-contained:
- * all errors are caught internally and written back to the report row as
- * generationStatus = "failed" to allow the frontend to surface them.
- */
-export async function runReportGeneration(
+async function fetchExperimentsForGeneration(
   reportId: string,
   sciNoteUserId: string,
   dateRangeStart: string,
   dateRangeEnd: string,
-): Promise<void> {
-  try {
+): Promise<ExperimentRow[]> {
+  // Check if explicit links exist for this report
+  const linksResult = await pool.query<{ experiment_record_id: string }>(
+    `SELECT experiment_record_id FROM weekly_report_experiment_links WHERE report_id = $1`,
+    [reportId],
+  );
+
+  if (linksResult.rows.length > 0) {
+    // Use junction table records
+    const ids = linksResult.rows.map((r) => r.experiment_record_id);
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
     const expResult = await pool.query<ExperimentRow>(
       `SELECT
          e.id,
@@ -342,22 +342,82 @@ export async function runReportGeneration(
          e.created_at
        FROM experiment_records e
        JOIN scinotes s ON s.id = e.sci_note_id
-       WHERE s.user_id = $1
+       WHERE e.id IN (${placeholders})
          AND e.is_deleted = false
-         AND e.created_at >= $2::date
-         AND e.created_at < ($3::date + interval '1 day')
        ORDER BY e.created_at DESC`,
-      [sciNoteUserId, dateRangeStart, dateRangeEnd],
+      ids,
+    );
+    return expResult.rows;
+  }
+
+  // Fall back: date-range query (backward-compat)
+  const expResult = await pool.query<ExperimentRow>(
+    `SELECT
+       e.id,
+       e.sci_note_id,
+       s.title AS sci_note_title,
+       e.title,
+       e.experiment_status,
+       e.purpose_input,
+       e.current_modules,
+       e.created_at
+     FROM experiment_records e
+     JOIN scinotes s ON s.id = e.sci_note_id
+     WHERE s.user_id = $1
+       AND e.is_deleted = false
+       AND e.created_at >= $2::date
+       AND e.created_at < ($3::date + interval '1 day')
+     ORDER BY e.created_at DESC`,
+    [sciNoteUserId, dateRangeStart, dateRangeEnd],
+  );
+  return expResult.rows;
+}
+
+// ---------------------------------------------------------------------------
+// runReportGeneration — async pipeline (called after 202 is sent)
+//
+// Parameters:
+//   reportId     — the weekly_reports row to update
+//   sciNoteUserId — user_id that owns the scinotes (may differ from the
+//                   instructor who triggered generation)
+//   dateRangeStart / dateRangeEnd — inclusive date bounds for experiment query
+//                                   (used only if no junction table links exist)
+// ---------------------------------------------------------------------------
+
+/**
+ * Executes the full generation pipeline asynchronously.
+ *
+ * Must be invoked via `setImmediate` from the route handler so it runs
+ * after the HTTP 202 response has been flushed. It is self-contained:
+ * all errors are caught internally and written back to the report row as
+ * generationStatus = "failed" to allow the frontend to surface them.
+ *
+ * Source priority:
+ *   1. Explicit links in weekly_report_experiment_links (student-selected)
+ *   2. Date-range fallback (created_at BETWEEN dateRangeStart AND dateRangeEnd)
+ */
+export async function runReportGeneration(
+  reportId: string,
+  sciNoteUserId: string,
+  dateRangeStart: string,
+  dateRangeEnd: string,
+): Promise<void> {
+  try {
+    const rows = await fetchExperimentsForGeneration(
+      reportId,
+      sciNoteUserId,
+      dateRangeStart,
+      dateRangeEnd,
     );
 
-    const aiContent = buildAiContent(expResult.rows);
+    const aiContent = buildAiContent(rows);
 
     await db
       .update(weeklyReportsTable)
       .set({
         generationStatus: "generated",
         aiContentJson:    JSON.stringify(aiContent),
-        experimentCount:  expResult.rows.length,
+        experimentCount:  rows.length,
         updatedAt:        new Date(),
       })
       .where(eq(weeklyReportsTable.id, reportId));

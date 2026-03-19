@@ -44,8 +44,9 @@ The project employs a pnpm monorepo structure, separating deployable services (`
 -   **Key Services**: Report submission and AI report generation (asynchronous).
 -   **Routes**: Handles messages, team, reports, users, and AI chat.
 -   **Go API Proxy**: Proxies specific authentication, SciNote, and experiment-related API calls to the Go API server.
--   **Data Ownership**: Manages `users` (shared), `students`, `papers`, `weekly_reports`, `report_comments`, `messages`, and `shares` tables.
+-   **Data Ownership**: Manages `users` (shared), `students`, `papers`, `weekly_reports`, `report_comments`, `weekly_report_experiment_links`, `messages`, and `shares` tables.
 -   **Share System**: Manages sharing of experiments and reports between users.
+-   **Weekly Report ↔ Experiment Linkage**: `weekly_report_experiment_links` junction table stores explicitly student-selected experiment record IDs per report. `PUT /reports/:id/links` replaces the full link set (draft/needs_revision only); `GET /reports/:id/links` returns linked experiments with full details. AI generation (`runReportGeneration`) checks junction table first; falls back to date-range query if no links exist. Student UI: wizard Step 2 shows candidates with checkboxes (default unselected); ReportWorkPanel shows a "关联实验记录" section with "管理关联" modal. Instructor UI: ReportCard shows a collapsible "关联实验记录" section (read-only) when expanded.
 
 **Go API Server (`artifacts/go-api`)**:
 -   **Framework**: chi v5.

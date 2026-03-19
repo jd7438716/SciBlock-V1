@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 import { weeklyReportsTable } from "./students";
 
 // ---------------------------------------------------------------------------
@@ -30,3 +30,40 @@ export const reportCommentsTable = pgTable("report_comments", {
 
 export type ReportComment = typeof reportCommentsTable.$inferSelect;
 export type InsertReportComment = typeof reportCommentsTable.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// weekly_report_experiment_links — 周报 ↔ 实验记录 显式关联
+//
+// Stores the explicit, student-confirmed set of experiment records associated
+// with a weekly report.  This is the source of truth for the linkage —
+// not a dynamic query result.
+//
+// Design notes:
+//  - report_id has a CASCADE FK into weekly_reports.id so links are cleaned
+//    up automatically when a report is deleted.
+//  - experiment_record_id has NO FK constraint because experiment_records is
+//    owned by the Go API service (cross-service boundary).  Existence/ownership
+//    is validated at the application layer (PUT /reports/:id/links).
+//  - A (report_id, experiment_record_id) UNIQUE constraint prevents duplicates.
+//  - The candidate set for selection is generated separately via
+//    GET /reports/preview (currently based on created_at, extensible later).
+// ---------------------------------------------------------------------------
+
+export const reportExperimentLinksTable = pgTable(
+  "weekly_report_experiment_links",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => weeklyReportsTable.id, { onDelete: "cascade" }),
+    /** experiment_records.id (Go API domain — no DB-level FK) */
+    experimentRecordId: text("experiment_record_id").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    uniqLink: unique("uq_report_experiment_link").on(t.reportId, t.experimentRecordId),
+  }),
+);
+
+export type ReportExperimentLink = typeof reportExperimentLinksTable.$inferSelect;
+export type InsertReportExperimentLink = typeof reportExperimentLinksTable.$inferInsert;

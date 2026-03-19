@@ -183,6 +183,27 @@ export interface AddWeeklyReportCommentPayload {
 // Review payload (instructor → POST /reports/:id/review)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Linked experiment records — PUT /reports/:id/links  &  GET /reports/:id/links
+// ---------------------------------------------------------------------------
+
+/** A single experiment record returned by GET /reports/:id/links */
+export interface LinkedExperiment {
+  id: string;
+  sciNoteId: string;
+  sciNoteTitle: string;
+  title: string;
+  status: string;
+  purposeInput: string | null;
+  createdAt: string;
+}
+
+/** Response shape for GET /reports/:id/links */
+export interface ReportLinksResponse {
+  experimentRecordIds: string[];
+  experiments: LinkedExperiment[];
+}
+
 /** The two terminal review decisions an instructor can make on a weekly report. */
 export type ReviewAction = "approve" | "request_revision";
 

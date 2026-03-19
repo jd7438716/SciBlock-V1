@@ -6,6 +6,7 @@ import type {
   UpdateWeeklyReportPayload,
   AddWeeklyReportCommentPayload,
   ReportPreviewResponse,
+  ReportLinksResponse,
   ReviewReportPayload,
 } from "@/types/weeklyReport";
 
@@ -69,6 +70,24 @@ export async function pollUntilGenerated(
     await new Promise((res) => setTimeout(res, intervalMs));
   }
   throw new Error("生成超时，请稍后刷新页面查看结果。");
+}
+
+// ---------------------------------------------------------------------------
+// Experiment links — GET /reports/:id/links  &  PUT /reports/:id/links
+//
+// GET returns the explicitly linked experiments for a report (student + instructor).
+// PUT replaces the full set of linked experiment record IDs (student-only, editable states).
+// ---------------------------------------------------------------------------
+
+export function fetchReportLinks(reportId: string): Promise<ReportLinksResponse> {
+  return apiFetch<ReportLinksResponse>(`/reports/${reportId}/links`);
+}
+
+export function saveReportLinks(reportId: string, experimentRecordIds: string[]): Promise<{ reportId: string; experimentRecordIds: string[]; count: number }> {
+  return apiFetch(`/reports/${reportId}/links`, {
+    method: "PUT",
+    body: JSON.stringify({ experimentRecordIds }),
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -5,9 +5,11 @@
  * GET    /reports/team                — 导师查看全团队周报（按周筛选）
  * GET    /reports/preview             — 预览某时间段内命中的实验（学生自用）
  * GET    /reports/:id                 — 查看单条周报
+ * GET    /reports/:id/links           — 查看周报关联实验记录（学生+导师）
  * POST   /reports                     — 创建周报
  * POST   /reports/:id/generate        — 触发汇总生成（规则化，异步写入 ai_content_json）
  * POST   /reports/:id/submit          — 提交周报
+ * PUT    /reports/:id/links           — 全量替换关联实验记录（draft/needs_revision 状态有效）
  * PATCH  /reports/:id                 — 更新周报内容 / 状态
  * DELETE /reports/:id                 — 删除周报
  * GET    /reports/:id/comments        — 查看评论
@@ -28,10 +30,11 @@ import { db, pool } from "@workspace/db";
 import {
   weeklyReportsTable,
   reportCommentsTable,
+  reportExperimentLinksTable,
   studentsTable,
   messagesTable,
 } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { requireInstructor } from "../middleware/requireAuth";
 import { getStudentByUserId } from "../services/student.service";
 import { hasShareAccess } from "../repositories/share.repository";
@@ -600,6 +603,211 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     console.error("[reports] DELETE /:id error:", err);
     res.status(500).json({ message: "Failed to delete report" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /reports/:id/links
+//
+// Returns the explicitly linked experiment records for this report.
+// Each item includes full experiment details (id, title, status, sciNote info).
+// Accessible by: report owner (student) OR instructor.
+// ---------------------------------------------------------------------------
+
+interface LinkedExperimentRow {
+  id: string;
+  sci_note_id: string;
+  sci_note_title: string;
+  title: string;
+  experiment_status: string;
+  purpose_input: string | null;
+  created_at: Date;
+}
+
+router.get("/:id/links", async (req, res) => {
+  const role = res.locals.role as string;
+  const id   = req.params["id"] as string;
+
+  // Fetch the report
+  const [report] = await db
+    .select()
+    .from(weeklyReportsTable)
+    .where(eq(weeklyReportsTable.id, id))
+    .limit(1);
+
+  if (!report) {
+    res.status(404).json({ message: "Report not found" });
+    return;
+  }
+
+  // Access control: student can only see their own; instructor can see all
+  if (role === "student") {
+    const student = await resolveStudentOrRespond(res.locals.userId, res, "GET /:id/links");
+    if (!student) return;
+    if (report.studentId !== student.id) {
+      res.status(403).json({ error: "forbidden", message: "Access denied" });
+      return;
+    }
+  }
+
+  try {
+    // Get link rows
+    const links = await db
+      .select()
+      .from(reportExperimentLinksTable)
+      .where(eq(reportExperimentLinksTable.reportId, id));
+
+    if (links.length === 0) {
+      res.json({ experimentRecordIds: [], experiments: [] });
+      return;
+    }
+
+    const recordIds = links.map((l) => l.experimentRecordId);
+
+    // Fetch full experiment details from Go API's tables (same DB)
+    const placeholders = recordIds.map((_, i) => `$${i + 1}`).join(", ");
+    const expResult = await pool.query<LinkedExperimentRow>(
+      `SELECT
+         e.id,
+         e.sci_note_id,
+         s.title AS sci_note_title,
+         e.title,
+         e.experiment_status,
+         e.purpose_input,
+         e.created_at
+       FROM experiment_records e
+       JOIN scinotes s ON s.id = e.sci_note_id
+       WHERE e.id IN (${placeholders})
+         AND e.is_deleted = false
+       ORDER BY e.created_at DESC`,
+      recordIds,
+    );
+
+    res.json({
+      experimentRecordIds: recordIds,
+      experiments: expResult.rows.map((e) => ({
+        id: e.id,
+        sciNoteId: e.sci_note_id,
+        sciNoteTitle: e.sci_note_title,
+        title: e.title,
+        status: e.experiment_status,
+        purposeInput: e.purpose_input,
+        createdAt: (e.created_at instanceof Date ? e.created_at : new Date(e.created_at)).toISOString(),
+      })),
+    });
+  } catch (err) {
+    console.error("[reports] GET /:id/links error:", err);
+    res.status(500).json({ message: "Failed to fetch linked experiments" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /reports/:id/links
+//
+// Replaces the full set of linked experiment records for this report.
+// Body: { experimentRecordIds: string[] }
+//
+// Access: student (own report, draft or needs_revision only).
+// Validates:
+//   - report exists and belongs to the student
+//   - report is in an editable state (draft | needs_revision)
+//   - all record IDs exist in experiment_records, belong to the same student,
+//     and are not soft-deleted
+// ---------------------------------------------------------------------------
+
+router.put("/:id/links", async (req, res) => {
+  const role = res.locals.role as string;
+  const id   = req.params["id"] as string;
+
+  if (role !== "student") {
+    res.status(403).json({ error: "forbidden", message: "Only students can update report links" });
+    return;
+  }
+
+  const student = await resolveStudentOrRespond(res.locals.userId, res, "PUT /:id/links");
+  if (!student) return;
+
+  // Fetch the report
+  const [report] = await db
+    .select()
+    .from(weeklyReportsTable)
+    .where(eq(weeklyReportsTable.id, id))
+    .limit(1);
+
+  if (!report) {
+    res.status(404).json({ message: "Report not found" });
+    return;
+  }
+
+  if (report.studentId !== student.id) {
+    res.status(403).json({ error: "forbidden", message: "You can only update links for your own reports" });
+    return;
+  }
+
+  const editableStatuses = ["draft", "needs_revision"];
+  if (!editableStatuses.includes(report.status)) {
+    res.status(422).json({
+      error: "not_editable",
+      message: "Links can only be updated while the report is in draft or needs_revision status",
+    });
+    return;
+  }
+
+  const { experimentRecordIds } = req.body as { experimentRecordIds: unknown };
+
+  if (!Array.isArray(experimentRecordIds)) {
+    res.status(400).json({ message: "experimentRecordIds must be an array" });
+    return;
+  }
+  if (experimentRecordIds.some((id) => typeof id !== "string")) {
+    res.status(400).json({ message: "All experimentRecordIds must be strings" });
+    return;
+  }
+
+  const ids = experimentRecordIds as string[];
+
+  // Validate that all record IDs exist and belong to this student's scinotes
+  if (ids.length > 0) {
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+    const validResult = await pool.query<{ id: string }>(
+      `SELECT e.id
+       FROM experiment_records e
+       JOIN scinotes s ON s.id = e.sci_note_id
+       WHERE e.id IN (${placeholders})
+         AND s.user_id = $${ids.length + 1}
+         AND e.is_deleted = false`,
+      [...ids, student.userId],
+    );
+
+    const validIds = new Set(validResult.rows.map((r) => r.id));
+    const invalid = ids.filter((rid) => !validIds.has(rid));
+    if (invalid.length > 0) {
+      res.status(422).json({
+        error: "invalid_records",
+        message: `Some experiment record IDs are invalid or not accessible: ${invalid.join(", ")}`,
+      });
+      return;
+    }
+  }
+
+  try {
+    // Full replace: delete existing, insert new (in a transaction)
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(reportExperimentLinksTable)
+        .where(eq(reportExperimentLinksTable.reportId, id));
+
+      if (ids.length > 0) {
+        await tx.insert(reportExperimentLinksTable).values(
+          ids.map((rid) => ({ reportId: id, experimentRecordId: rid })),
+        );
+      }
+    });
+
+    res.json({ reportId: id, experimentRecordIds: ids, count: ids.length });
+  } catch (err) {
+    console.error("[reports] PUT /:id/links error:", err);
+    res.status(500).json({ message: "Failed to update report links" });
   }
 });
 
