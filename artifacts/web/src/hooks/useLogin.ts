@@ -87,6 +87,8 @@ export function useLogin(): LoginFormState {
     } catch (err) {
       if (err instanceof ApiError) {
         setServerError(err.message);
+      } else if (err instanceof TypeError && import.meta.env.DEV) {
+        setServerError(`Network error: ${err.message}`);
       } else {
         setServerError("Something went wrong. Please try again.");
       }

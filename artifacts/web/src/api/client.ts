@@ -1,8 +1,11 @@
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, "");
-const API_ORIGIN = API_BASE_URL || (import.meta.env.DEV ? "http://localhost:8080" : "");
-const API_ROOT = API_ORIGIN ? `${API_ORIGIN}/api` : `${BASE}/api`;
+// In development the Vite dev-server proxies /api → localhost:8080, so a
+// relative path is correct and avoids mixed-content blocks (HTTPS page →
+// HTTP API). Only use VITE_API_BASE_URL when an explicit override is needed
+// (e.g. pointing at a staging backend from a local browser).
+const API_ROOT = API_BASE_URL ? `${API_BASE_URL}/api` : `${BASE}/api`;
 
 // ---------------------------------------------------------------------------
 // Storage keys
