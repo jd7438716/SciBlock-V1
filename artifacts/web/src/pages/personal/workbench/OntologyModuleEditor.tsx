@@ -23,6 +23,7 @@ import type { OntologyModule } from "@/types/workbench";
 import type { OntologyModuleStructuredData } from "@/types/ontologyModules";
 import { FLOW_TRIGGER_KEYS } from "@/types/workbench";
 import { useWorkbench } from "@/contexts/WorkbenchContext";
+import { hasBeenConfirmed } from "@/utils/experimentSelectors";
 import { ModuleBodyRenderer } from "./modules/shared/ModuleBodyRenderer";
 
 // ---------------------------------------------------------------------------
@@ -49,10 +50,7 @@ export function OntologyModuleEditor({ module }: Props) {
   //  2. The record has been confirmed at least once (confirmed or confirmed_dirty).
   // The hint tells the user that editing will push the record back to "待重新确认".
   const isHeritableModule = (FLOW_TRIGGER_KEYS as readonly string[]).includes(module.key);
-  const recordIsConfirmedState =
-    currentRecord.confirmationState === "confirmed" ||
-    currentRecord.confirmationState === "confirmed_dirty";
-  const showHeritableHint = isHeritableModule && recordIsConfirmedState;
+  const showHeritableHint = isHeritableModule && hasBeenConfirmed(currentRecord);
 
   /**
    * Incremental write: merges patch into current structuredData, then

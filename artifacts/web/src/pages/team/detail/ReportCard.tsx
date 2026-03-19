@@ -261,7 +261,7 @@ export function ReportCard({ report }: ReportCardProps) {
       <div className="px-3 pb-2 flex flex-wrap gap-1.5">
         <AttrPill
           label="提交"
-          value={new Date(report.submittedAt).toLocaleDateString("zh-CN")}
+          value={report.submittedAt ? new Date(report.submittedAt).toLocaleDateString("zh-CN") : "—"}
         />
       </div>
 

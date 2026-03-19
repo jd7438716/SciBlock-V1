@@ -77,17 +77,11 @@ export interface Paper {
 }
 
 // ---------------------------------------------------------------------------
-// WeeklyReport
+// WeeklyReport — canonical definition lives in types/weeklyReport.ts
+// Re-exported here for backward-compat; prefer importing from weeklyReport.ts
 // ---------------------------------------------------------------------------
 
-export interface WeeklyReport {
-  id: string;
-  studentId: string;
-  title: string;
-  content: string;
-  weekStart: string;
-  submittedAt: string;
-}
+export type { WeeklyReport } from "./weeklyReport";
 
 // ---------------------------------------------------------------------------
 // API request shapes

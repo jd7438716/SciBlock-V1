@@ -21,6 +21,7 @@ import type { StudentWithReport } from "@/hooks/reports/useTeamReports";
 import type { ReviewAction, LinkedExperiment } from "@/types/weeklyReport";
 import { parseReportContent, parseAiContent, fmtWeekRange, fmtWeekLabel } from "@/types/weeklyReport";
 import { fetchReportDates, fetchReportLinks } from "@/api/weeklyReport";
+import { isNewDateModel } from "@/utils/reportSelectors";
 
 function fmtDateCN(iso: string): string {
   const d = new Date(iso + "T00:00:00");
@@ -45,7 +46,7 @@ export function TeamReportDetailPanel({ selected, weekStart, weekEnd, onReview }
   const currentUserId = currentUser?.id ?? "";
 
   const report = selected?.report ?? null;
-  const isNewModel = !!report?.datesLastSavedAt;
+  const isNewModel = report != null && isNewDateModel(report);
 
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [linkedExperiments, setLinkedExperiments] = useState<LinkedExperiment[]>([]);

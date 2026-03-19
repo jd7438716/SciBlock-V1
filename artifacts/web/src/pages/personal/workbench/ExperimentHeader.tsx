@@ -14,6 +14,7 @@ import {
 } from "./InheritanceBanner";
 import { SharedWithAvatars } from "@/components/share/SharedWithAvatars";
 import { ShareModal } from "@/components/share/ShareModal";
+import { isDirtyRecord, isConfirmedClean, hasBeenConfirmed } from "@/utils/experimentSelectors";
 
 /**
  * ExperimentHeader — top section of the OntologyPanel.
@@ -121,9 +122,9 @@ export function ExperimentHeader() {
   }
 
   // Derived UI state from the authoritative confirmationState value.
-  const isDirty = currentRecord.confirmationState === "confirmed_dirty";
-  const isConfirmed = currentRecord.confirmationState === "confirmed";
-  const isInConfirmedState = isConfirmed || isDirty;
+  const isDirty = isDirtyRecord(currentRecord);
+  const isConfirmed = isConfirmedClean(currentRecord);
+  const isInConfirmedState = hasBeenConfirmed(currentRecord);
 
   const confirmButtonLabel = (() => {
     if (isConfirming) return "确认中…";
