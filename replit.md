@@ -110,6 +110,92 @@ The project employs a pnpm monorepo structure, separating deployable services (`
 
 ---
 
+## AI 周报生成 — 正式能力（已完成，已验收）
+
+**完成时间**: 2026-03-19
+
+### 正式语义
+
+| 概念 | 角色 | 说明 |
+|---|---|---|
+| 实验记录 | **素材** | AI 生成的唯一输入来源，严禁补充或推断实验记录之外的内容 |
+| 周报 | **总结** | 对本周实验活动的结构化综合摘要，面向导师阅读 |
+| links | **主素材来源** | 学生通过向导或管理弹窗显式选定的实验记录列表，优先级最高 |
+| 日期范围 fallback | **仅限旧周报** | 历史周报若从未经历 links 管理（`links_last_saved_at IS NULL`），允许按日期范围自动查询实验作为素材 |
+| 显式空 links | **不 fallback** | 学生主动保存了空 links（`links_last_saved_at IS NOT NULL` 但 count=0），系统尊重该决策，以零素材为基础生成，不注入日期范围实验 |
+
+### 生成路径（优先级）
+
+```
+callLlmForReport()
+  ├─ 成功且 JSON 合法 → source: "llm"       ← 主路径
+  └─ 任意失败 / JSON 无效 / 缺字段
+       └─ buildAiContent() 规则版 → source: "rule_fallback"  ← 备用路径
+```
+
+两条路径最终均写入 `generationStatus: "generated"`，用户侧无感知差异。
+
+### 技术规格
+
+- **AI 提供商**: qwen-plus via Aliyun DashScope（OpenAI-compatible 接口）
+- **环境变量**: `AI_PROVIDER=openai` · `AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1` · `AI_MODEL=qwen-plus` · `OPENAI_API_KEY`（DashScope key）
+- **推理参数**: `temperature: 0.3` · `max_tokens: 4096` · `response_format: { type: "json_object" }`
+- **超时**: 90 秒
+- **反幻觉约束**: 系统提示明确禁止补充、推断任何不在实验记录中的结论；信息不足时保守表达（"暂无明显趋势"）
+
+### 已验收场景
+
+| 场景 | 结果 |
+|---|---|
+| 1 条实验记录 → LLM 生成 | ✓ 通过 |
+| 2–3 条实验记录（跨 2 个 SciNote） | ✓ 通过 |
+| 4 条实验记录（跨 3 个 SciNote） | ✓ 通过，projectSummary 正确区分 3 组 |
+| 显式空 links（IS NOT NULL）→ 不 fallback | ✓ 通过，生成"无实验活动"摘要 |
+| callLlmForReport 强制返回 null → 规则 fallback | ✓ 通过，source=rule_fallback，流程不中断 |
+| 前端展示兼容性（AiReportContent 字段契约） | ✓ 通过，`_generationMeta` 为额外字段，前端忽略 |
+
+### 来源追踪
+
+每份生成的周报在 `weekly_reports.ai_content_json` 最外层嵌入：
+
+```json
+"_generationMeta": {
+  "source": "llm" | "rule_fallback",
+  "model": "qwen-plus",
+  "generatedAt": "ISO-8601",
+  "experimentCount": <number>
+}
+```
+
+**区分规则**:
+- `_generationMeta` 字段**不存在** → 该周报由旧版规则代码生成（功能上线前的历史记录）
+- `source: "llm"` → 实际由 qwen-plus 生成
+- `source: "rule_fallback"` → LLM 路径失败，由 `buildAiContent()` 规则替代
+
+**快速排查 SQL**:
+```sql
+SELECT id, ai_content_json->'_generationMeta' AS meta
+FROM weekly_reports
+WHERE id = '<report-id>';
+```
+
+### 当前已知限制
+
+1. 实验记录数据质量直接决定 AI 内容质量（无标题、无目的则输出有限）
+2. 生成耗时约 5–15 秒，取决于实验数量和网络延迟
+3. 每次重新生成会覆盖前一次结果（无版本历史）
+4. `buildAiContent()` 规则版输出相对机械，作为 fallback 可接受，不适合作为主路径
+
+### 实现文件
+
+| 文件 | 说明 |
+|---|---|
+| `artifacts/api-server/src/services/ai-client.service.ts` | 共享 AI 客户端：`buildProviderConfig()` · `callChat()` · `callChatJson()` |
+| `artifacts/api-server/src/services/report-generation.service.ts` | 生成主逻辑：系统提示 · 素材格式化 · 校验 · LLM 调用 · fallback · 来源追踪 |
+| `artifacts/api-server/src/routes/reports.ts` | 触发入口：`POST /reports/:id/generate`（202 异步）|
+
+---
+
 ## 实验记录 ↔ 周报联动 — 第二阶段候选优化项（待排期）
 
 以下为候选项，**尚未实现**，供后续排期参考：
