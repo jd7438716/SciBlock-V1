@@ -10,16 +10,22 @@
  * No business logic here — all data flow is through props.
  */
 
-import React from "react";
-import { Sparkles } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Sparkles, CalendarDays, FlaskConical } from "lucide-react";
 import { ReportStatusTag } from "@/components/reports/ReportStatusTag";
 import { ReportContentView } from "@/components/reports/ReportContentView";
 import { CommentThread } from "@/components/reports/CommentThread";
 import { ReportReviewActions } from "@/components/reports/ReportReviewActions";
 import { useCurrentUser } from "@/contexts/UserContext";
 import type { StudentWithReport } from "@/hooks/reports/useTeamReports";
-import type { ReviewAction } from "@/types/weeklyReport";
+import type { ReviewAction, LinkedExperiment } from "@/types/weeklyReport";
 import { parseReportContent, parseAiContent, fmtWeekRange, fmtWeekLabel } from "@/types/weeklyReport";
+import { fetchReportDates, fetchReportLinks } from "@/api/weeklyReport";
+
+function fmtDateCN(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
 
 interface Props {
   selected: StudentWithReport | null;
@@ -38,6 +44,26 @@ export function TeamReportDetailPanel({ selected, weekStart, weekEnd, onReview }
   const currentUserName = currentUser?.name ?? "";
   const currentUserId = currentUser?.id ?? "";
 
+  const report = selected?.report ?? null;
+  const isNewModel = !!report?.datesLastSavedAt;
+
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [linkedExperiments, setLinkedExperiments] = useState<LinkedExperiment[]>([]);
+
+  useEffect(() => {
+    if (!report || !isNewModel) {
+      setSelectedDates([]);
+      setLinkedExperiments([]);
+      return;
+    }
+    fetchReportDates(report.id)
+      .then((r) => setSelectedDates(r.dates))
+      .catch(() => setSelectedDates([]));
+    fetchReportLinks(report.id)
+      .then((r) => setLinkedExperiments(r.experiments))
+      .catch(() => setLinkedExperiments([]));
+  }, [report?.id, isNewModel]);
+
   if (!selected) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-400 bg-gray-50">
@@ -45,8 +71,6 @@ export function TeamReportDetailPanel({ selected, weekStart, weekEnd, onReview }
       </div>
     );
   }
-
-  const { report } = selected;
 
   if (!report) {
     const last = selected.lastSubmission;
@@ -131,6 +155,50 @@ export function TeamReportDetailPanel({ selected, weekStart, weekEnd, onReview }
           <div className="bg-white rounded-xl border border-gray-200 px-6 py-5 mb-5">
             <ReportContentView content={parseReportContent(report)} />
           </div>
+        )}
+
+        {/* Selected dates + linked experiments (new multi-date model only) */}
+        {isNewModel && (
+          <>
+            {selectedDates.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 px-5 py-4 mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CalendarDays size={14} className="text-violet-500" />
+                  <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">已选日期</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedDates.map((d) => (
+                    <span
+                      key={d}
+                      className="text-xs px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-100 font-medium"
+                    >
+                      {fmtDateCN(d)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-xl border border-gray-200 px-5 py-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FlaskConical size={14} className="text-violet-500" />
+                <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">关联实验记录</span>
+                <span className="ml-auto text-xs text-gray-400">{linkedExperiments.length} 条</span>
+              </div>
+              {linkedExperiments.length === 0 ? (
+                <p className="text-xs text-gray-400">本周报未关联任何实验记录</p>
+              ) : (
+                <ul className="divide-y divide-gray-50">
+                  {linkedExperiments.map((exp) => (
+                    <li key={exp.id} className="py-2 first:pt-0 last:pb-0">
+                      <p className="text-sm text-gray-800 font-medium truncate">{exp.title}</p>
+                      <p className="text-xs text-gray-400 truncate">{exp.sciNoteTitle} · {exp.status}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </>
         )}
 
         {/* Review actions panel */}

@@ -371,12 +371,17 @@ function Step2({ selectedDates, onBack, onNext }: Step2Props) {
               return (
                 <div key={group.date}>
                   {/* Group header */}
-                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-50">
+                  <div
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-50"
+                    aria-label={`日期组 ${group.date}`}
+                  >
                     {hasExps ? (
                       <button
                         type="button"
                         onClick={() => toggleGroup(group)}
                         className="shrink-0"
+                        aria-label={`全选 ${group.date} 日期组`}
+                        aria-pressed={allChecked}
                       >
                         {allChecked ? (
                           <CheckSquare size={15} className="text-violet-600" />
@@ -405,6 +410,8 @@ function Step2({ selectedDates, onBack, onNext }: Step2Props) {
                         type="button"
                         onClick={() => toggleCollapse(group.date)}
                         className="text-gray-400 hover:text-gray-600 transition-colors"
+                        aria-label={`${isCollapsed ? "展开" : "折叠"} ${group.date} 组`}
+                        aria-expanded={!isCollapsed}
                       >
                         {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                       </button>
@@ -419,6 +426,9 @@ function Step2({ selectedDates, onBack, onNext }: Step2Props) {
                         return (
                           <div
                             key={e.id}
+                            role="checkbox"
+                            aria-checked={checked}
+                            aria-label={`实验记录 ${e.title} (${group.date})`}
                             className={`flex items-center px-4 py-2 gap-3 cursor-pointer transition-colors ${
                               checked ? "bg-violet-50" : "hover:bg-gray-50"
                             }`}
