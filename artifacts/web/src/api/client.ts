@@ -8,11 +8,12 @@ const API_ROOT = API_ORIGIN ? `${API_ORIGIN}/api` : `${BASE}/api`;
 // Storage keys
 // ---------------------------------------------------------------------------
 
-const TOKEN_KEY = "sciblock:token";
-const USER_KEY = "sciblock:currentUser";
-// TRANSITION: removed once all student accounts have a confirmed user_id binding.
+const TOKEN_KEY      = "sciblock:token";
+const USER_KEY       = "sciblock:currentUser";
+// Legacy key: cleared at logout for accounts migrated before user_id binding was enforced.
+// No longer read — kept only for cleanup on logout.
 const STUDENT_ID_KEY = "sciblock:myStudentId";
-const LOGIN_PATH = `${BASE}/login`;
+const LOGIN_PATH     = `${BASE}/login`;
 
 // ---------------------------------------------------------------------------
 // Token storage helpers
