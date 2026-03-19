@@ -118,6 +118,50 @@ selected_dates → candidate experiments → explicit links → AI generation
 
 ---
 
+## Experiment Report: Phase 1 Refactoring (Report View Model Pipeline)
+
+**Status**: Complete as of 2026-03-19. TypeScript clean (0 errors).
+
+### What changed
+
+Replaced the old local stub (`buildReportHtml` — raw module data serialized to HTML lists via a 1600ms setTimeout) with a proper **three-layer pipeline**:
+
+```
+ReportGeneratorInput
+  → mapModulesToReportModel()    [utils/reportMapper.ts]
+  → ExperimentReportModel
+  → renderReportModel()          [utils/reportRenderer.ts]
+  → HTML string
+```
+
+### New files
+| File | Role |
+|---|---|
+| `src/utils/reportMapper.ts` | Maps ontology module data → ExperimentReportModel. Contains all "modules → report" transformation logic. Caps list lengths (MAX_SYSTEM_OBJECTS=5, MAX_PREP_PER_CAT=5, MAX_PROCEDURE_STEPS=8, MAX_MEASUREMENTS=5). |
+| `src/utils/reportRenderer.ts` | Renders ExperimentReportModel → TipTap-compatible HTML. Report-oriented sections with Chinese numeral headings. Placeholder sections for findings and conclusion. |
+
+### Modified files
+| File | Change |
+|---|---|
+| `src/types/report.ts` | Added `ExperimentReportModel` and sub-types (`ReportSystemSummary`, `ReportPreparationSummary`, `ReportProcedureSummary`, `ReportMeasurementDataSummary`, etc.). Infrastructure types (ReportStatus, ExperimentReport, ReportGeneratorInput) unchanged. |
+| `src/api/report.ts` | Replaced `buildReportHtml()` body with mapper+renderer call. Function signature and 1.5 s delay preserved — zero changes needed by callers (WorkbenchContext, useExperimentReport). |
+
+### Report structure (9 sections)
+1. Header — title, experimentType, generatedAt timestamp
+2. 实验目的 — from `objective` (omitted if empty)
+3. 实验概述 — template-based 2–4 sentence executive summary (Phase 2: AI-generated)
+4. 实验系统与研究对象 — capped role-aware object list
+5. 实验准备 — grouped by category, capped per category
+6. 实验过程 — top-N key steps with primary param
+7. 测量与数据获取 — merged measurement methods + data types
+8. 结果分析 — placeholder (Phase 2: AI-generated analysis)
+9. 实验结论 — placeholder (Phase 2: AI-generated conclusion)
+
+### Phase 2 migration path
+Replace the `setTimeout` body in `api/report.ts` with a `POST /api/experiments/:id/report/generate` call. All callers stay unchanged.
+
+---
+
 ## Phase 2 Candidate Optimizations (Backlog — Not Yet Implemented)
 
 The following improvements are scoped but deferred:

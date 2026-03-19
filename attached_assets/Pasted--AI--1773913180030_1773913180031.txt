@@ -1,0 +1,178 @@
+现在开始进入“实验报告第一阶段重构”，这次先不要接 AI 生成，先把右侧区域从“左侧模块内容复制区”重构为“真正的实验报告视图层”。
+
+目标不是先做智能生成，而是先把报告的数据组织方式、展示结构和代码分层改对。当前 buildReportHtml() 这种把左侧 structuredData 直接序列化成 HTML 列表的实现方式，需要停止继续扩展。
+
+请按下面要求实施：
+
+一、这次重构的总体目标
+
+把当前实验报告从：
+“左侧五个模块内容的 HTML 拼接展示”
+升级为：
+“基于独立 Report View Model 的实验报告展示层”
+
+这次先做：
+- 报告结构重组
+- mapper 层抽象
+- 右侧展示改版
+- 保持现有 UI 状态流（idle / generating / ready / error）尽量不破坏
+
+这次先不做：
+- 不接真实 AI
+- 不做复杂摘要推理
+- 不改成后端生成
+- 不做数据库迁移（持久化放下一阶段）
+
+二、必须完成的架构改造
+
+1. 新增独立的 Report View Model
+不要再让报告生成器直接依赖 system/preparation/operation/measurement/data 的原始 structuredData 展示逻辑。
+
+请新增独立的报告模型，例如：
+- title
+- experimentType
+- objective
+- reportSummary
+- systemSummary
+- preparationSummary
+- procedureSummary
+- measurementSummary
+- dataSummary
+- findingsPlaceholder
+- conclusionPlaceholder
+
+要求：
+- 这是“报告层模型”，不是原始模块结构镜像
+- 命名要面向报告，不要继续沿用左侧 ontology module 的字段组织方式
+- 类型定义单独放在 report 相关 types 文件中
+
+2. 新增 mapper 层
+请新增独立 mapper，例如：
+- mapModulesToReportModel()
+或类似命名
+
+职责：
+- 输入：当前实验记录 + 各模块 structuredData
+- 输出：Report View Model
+
+要求：
+- 所有“从模块数据到报告内容”的转换集中在 mapper 层
+- ReportSection 不直接读原始 module item 数组并自己 map HTML
+- 后续即使 ontology module 字段变化，也尽量只改 mapper，不影响报告 UI
+
+3. 停止继续使用 buildReportHtml() 直接拼接五大模块原始列表作为报告正文
+可以临时保留 html 输出机制，但必须改成：
+先得到 report model
+再由 report model 渲染成 HTML
+
+也就是说，生成链路要变成：
+
+raw modules
+→ report mapper
+→ report model
+→ report html renderer
+
+而不是现在这种：
+raw modules
+→ 直接拼 HTML
+
+三、右侧实验报告的内容结构要改成“报告式结构”
+
+请把右侧报告改造成更像实验报告，而不是模块复述。建议结构如下：
+
+1. 报告标题
+- 实验名称 / 实验类型
+
+2. 实验目的
+- 来自 objective，但要作为独立报告段落展示
+- 不要只是一行字段
+
+3. 实验概述
+- 用一段较短摘要说明本次实验做了什么
+- 这一步先不用 AI，可以用模板化句子根据已有字段拼出 2~4 句话
+- 核心是“概述”，不是把全部对象逐条列出来
+
+4. 实验系统与对象
+- 不是把所有 systemObjects 原样平铺
+- 应该做摘要化展示
+- 例如：本实验涉及哪些核心对象/材料/设备/角色
+- 控制展示密度，不要成为原始字段 dump
+
+5. 实验准备
+- 只展示关键准备事项摘要
+- 不要把 prepItems 全量原样复制成冗长列表，除非没有其他信息可用
+- 可以做“按类别归纳 + 关键项列举”
+
+6. 实验过程
+- 这是报告中的“过程描述”，不是 operationSteps 原始清单照搬
+- 可以保留步骤要点，但要更接近“过程概述”
+- 如果一定保留步骤，也要做简化
+
+7. 测量与数据获取
+- 合并 measurement + data，不要像现在一样完全割裂
+- 表达成“采用了什么测量/表征方法，获取了哪些类型的数据”
+
+8. 结果分析
+- 当前先放占位，但占位方式要更专业，不要只是“请在此补充”
+- 要做成明确的报告区块，便于下一阶段接 AI
+- 可显示提示文案，例如：
+  “本区块将在下一阶段基于实验数据、测量结果和对照信息自动生成分析内容，当前可由用户手动补充。”
+
+9. 初步结论
+- 当前先放结构化占位
+- 为下一阶段 AI 或手动编辑预留独立区块
+
+四、展示要求
+
+1. 不要再出现“左边五个模块逐块复制到右边”的视觉效果
+右侧必须明显看起来是“重新组织后的报告”。
+
+2. 信息密度要控制
+右侧报告不是原始记录详情页，不要把 item.attributes 全部倾倒出来。
+
+3. 允许保留少量条目列表，但只能作为摘要补充
+比如关键对象、关键步骤、关键测量方法，可以列 3~5 条，不要全量 dump。
+
+4. ReportSection 继续支持编辑模式
+现有 TipTap 只读 / 编辑切换机制可以保留。
+但默认生成出来的内容必须是新的报告结构。
+
+五、代码分层要求
+
+请严格分层，不要把逻辑重新塞回超长文件：
+
+- 类型：report types
+- 数据转换：report mapper
+- HTML 渲染：report renderer
+- UI 展示：ReportSection / ReportProgress
+- 触发逻辑：hook 或独立逻辑层
+
+不要把 mapper 和 renderer 继续混写在 api/report.ts 一个文件里。
+建议拆成类似：
+- types/report.ts
+- utils/reportMapper.ts
+- utils/reportRenderer.ts
+- api/report.ts
+
+六、这次先不做的事
+
+请不要在这一轮做以下内容：
+- 不接真实大模型
+- 不接后端 report 持久化
+- 不做数据库改动
+- 不做自动分析算法
+- 不做复杂结论生成
+
+这一轮的目标只有一个：
+先把“实验报告的结构和代码组织方式”改正确。
+
+七、交付要求
+
+完成后请给我：
+
+1. 修改了哪些文件
+2. 新增了哪些类型 / mapper / renderer
+3. 当前 report model 的字段结构
+4. 右侧实验报告新的区块结构
+5. 说明现在相比旧实现，哪些地方已经不再是“左侧内容复制”
+6. 明确说明还有哪些内容仍然是占位，准备留到下一阶段 AI / 持久化再做
