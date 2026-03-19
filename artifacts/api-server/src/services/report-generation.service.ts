@@ -1,29 +1,25 @@
 /**
  * report-generation.service.ts
  *
- * Handles rule-based AI report content generation.
+ * Weekly report AI content generation pipeline.
  *
- * Responsibilities:
- *   - Define all domain types for generated AI content
- *   - Provide `buildAiContent()` to transform raw experiment rows into a
- *     structured AiReportContent object (pure function, no I/O)
- *   - Provide `runReportGeneration()` to execute the full async pipeline:
- *     query experiments → build content → write back to DB
+ * Generation strategy (in priority order):
+ *   1. LLM (qwen-plus via DashScope / OpenAI-compatible) — primary path
+ *   2. Rule-based buildAiContent() — fallback when LLM is unavailable,
+ *      returns invalid JSON, or is missing required fields
  *
- * Design notes:
- *   - No LLM is called in this phase. Content is derived entirely from
- *     experiment record fields (title, status, purpose_input, current_modules).
- *   - The AiReportContent data contract is final-form. Switching to a real
- *     LLM later only requires replacing `buildAiContent()` body — no consumer
- *     code changes needed.
- *   - `runReportGeneration()` is called via `setImmediate` from the route
- *     handler AFTER the 202 response has already been sent. It must be fully
- *     self-contained and must never throw unhandled exceptions.
+ * Tracking: every generated report embeds `_generationMeta` inside
+ * `ai_content_json` to record whether the result came from "llm" or
+ * "rule_fallback". The frontend ignores this field; it is for diagnostics.
+ *
+ * runReportGeneration() is called via setImmediate after the 202 response
+ * has been flushed. It is fully self-contained and must never throw.
  */
 
 import { db, pool } from "@workspace/db";
 import { weeklyReportsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { buildProviderConfig, callChatJson } from "./ai-client.service";
 
 // ---------------------------------------------------------------------------
 // Raw DB row types (scoped to generation — not exposed to route layer)
@@ -306,6 +302,196 @@ export function buildAiContent(experiments: ExperimentRow[]): AiReportContent {
 }
 
 // ---------------------------------------------------------------------------
+// LLM-based generation — system prompt, user message builder, and caller
+// ---------------------------------------------------------------------------
+
+/**
+ * System prompt for weekly report generation.
+ *
+ * Key design decisions:
+ *  - Explicit anti-hallucination clause: model must only use provided data
+ *  - Conservative expression when information is insufficient
+ *  - Strict JSON schema contract — no extra fields allowed
+ *  - Synthesis over enumeration: find patterns, not lists
+ */
+const REPORT_SYSTEM_PROMPT = `你是一位科研实验室周报助理。你的任务是根据学生本周关联的实验记录，生成一份结构化的科研进展摘要，供导师阅读。
+
+【核心原则】
+1. 只能基于用户提供的实验记录素材生成内容。严禁补充、推断或编造任何不存在于原始记录中的实验结论、趋势或结果。
+2. 当实验记录信息不足以得出确定性结论时，应保守表达（如"暂无明显趋势"、"信息尚不充分"），不得猜测。
+3. 不要逐条罗列实验，要提炼本周核心主题和关键发现，像"阶段性总结"而非流水账。
+4. 语言专业、简洁，面向导师阅读。
+
+【输出格式】
+你必须严格输出以下 JSON 结构，不得添加额外字段，所有字段必须存在：
+{
+  "summary": "string — 2-3句话，描述本周整体进展，仅基于实际实验记录",
+  "theme": "string — 本周核心研究主题，15字以内，来自实际实验目的",
+  "projectSummary": [
+    { "sciNoteId": "string", "sciNoteTitle": "string", "experimentCount": number }
+  ],
+  "statusDistribution": {
+    "exploring": number,
+    "reproducible": number,
+    "verified": number,
+    "failed": number,
+    "total": number,
+    "conclusion": "string — 对本周进展态势的一句话判断，如实反映状态分布"
+  },
+  "parameterChanges": [
+    {
+      "paramName": "string",
+      "changeDescription": "string — 描述实际记录中体现的参数或方向变化",
+      "relatedExperiments": ["string"],
+      "impact": "string — 如无明确结论请写'尚无明确结论'"
+    }
+  ],
+  "operationSummary": [
+    { "step": "string", "note": "string" }
+  ],
+  "resultsTrends": [
+    {
+      "direction": "string",
+      "finding": "string — 仅描述实际出现的结果，信息不足时写'暂无明显趋势'",
+      "hasClearTrend": boolean,
+      "relatedExperiments": ["string"]
+    }
+  ],
+  "provenanceExperiments": [
+    {
+      "id": "string",
+      "title": "string",
+      "sciNoteId": "string",
+      "sciNoteTitle": "string",
+      "date": "YYYY-MM-DD",
+      "status": "string"
+    }
+  ]
+}`;
+
+/**
+ * Formats experiment rows into a structured text block for the LLM user message.
+ */
+function buildExperimentsPrompt(experiments: ExperimentRow[]): string {
+  if (experiments.length === 0) {
+    return "本周无关联实验记录，请生成一份说明本周无实验数据的周报摘要。";
+  }
+
+  const groupedBySciNote = new Map<string, { title: string; exps: ExperimentRow[] }>();
+  for (const e of experiments) {
+    const entry = groupedBySciNote.get(e.sci_note_id);
+    if (entry) {
+      entry.exps.push(e);
+    } else {
+      groupedBySciNote.set(e.sci_note_id, { title: e.sci_note_title, exps: [e] });
+    }
+  }
+
+  const lines: string[] = [
+    `本周关联实验记录共 ${experiments.length} 条，涉及 ${groupedBySciNote.size} 个项目：`,
+    "",
+  ];
+
+  for (const [sciNoteId, { title, exps }] of groupedBySciNote.entries()) {
+    lines.push(`【项目】${title}（${exps.length} 条）`);
+    for (let i = 0; i < exps.length; i++) {
+      const e = exps[i];
+      lines.push(`  ${i + 1}. [${e.experiment_status}] ${e.title}`);
+      if (e.purpose_input?.trim()) {
+        lines.push(`     实验目的：${e.purpose_input.trim().slice(0, 200)}`);
+      }
+
+      // Extract confirmed module keys
+      let confirmedModules: string[] = [];
+      try {
+        const mods = JSON.parse(e.current_modules ?? "[]") as Array<{ key: string; status: string }>;
+        confirmedModules = mods.filter((m) => m.status === "confirmed").map((m) => m.key);
+      } catch { /* ignore */ }
+      if (confirmedModules.length > 0) {
+        lines.push(`     已确认环节：${confirmedModules.join("、")}`);
+      }
+      lines.push("");
+    }
+  }
+
+  lines.push("请基于以上实验记录，生成结构化周报 JSON。注意：只能基于上述数据，不得添加任何不存在的信息。");
+
+  // Also emit the sciNoteId values so the model can populate provenanceExperiments correctly
+  lines.push("");
+  lines.push("【实验 ID 参照表（用于 provenanceExperiments 字段）】");
+  for (const e of experiments) {
+    const dateStr = (e.created_at instanceof Date ? e.created_at : new Date(e.created_at))
+      .toISOString()
+      .slice(0, 10);
+    lines.push(`  ${e.id} | ${e.sci_note_id} | ${e.sci_note_title} | ${e.title} | ${dateStr} | ${e.experiment_status}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Validates that a parsed JSON value matches the AiReportContent shape.
+ * Only checks required top-level fields — allows extra fields (ignored).
+ */
+function validateAiContent(data: unknown): data is AiReportContent {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+
+  return (
+    typeof d["summary"] === "string" &&
+    typeof d["theme"] === "string" &&
+    Array.isArray(d["projectSummary"]) &&
+    typeof d["statusDistribution"] === "object" && d["statusDistribution"] !== null &&
+    Array.isArray(d["parameterChanges"]) &&
+    Array.isArray(d["operationSummary"]) &&
+    Array.isArray(d["resultsTrends"]) &&
+    Array.isArray(d["provenanceExperiments"])
+  );
+}
+
+/**
+ * Calls the LLM and returns a validated AiReportContent, or null on any failure.
+ * Failures are logged but never thrown — caller handles fallback.
+ */
+async function callLlmForReport(
+  experiments: ExperimentRow[],
+  reportId: string,
+): Promise<AiReportContent | null> {
+  const config = buildProviderConfig();
+  if (!config) {
+    console.warn(`[report-generation] ${reportId}: no AI provider configured, skipping LLM`);
+    return null;
+  }
+
+  const userMessage = buildExperimentsPrompt(experiments);
+
+  let rawJson: string;
+  try {
+    console.info(`[report-generation] ${reportId}: calling LLM (${config.model}) with ${experiments.length} experiments`);
+    rawJson = await callChatJson(config, REPORT_SYSTEM_PROMPT, userMessage, 90_000);
+  } catch (err) {
+    console.warn(`[report-generation] ${reportId}: LLM API call failed —`, err instanceof Error ? err.message : err);
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch {
+    console.warn(`[report-generation] ${reportId}: LLM returned non-JSON —`, rawJson.slice(0, 300));
+    return null;
+  }
+
+  if (!validateAiContent(parsed)) {
+    console.warn(`[report-generation] ${reportId}: LLM JSON missing required fields —`, rawJson.slice(0, 300));
+    return null;
+  }
+
+  console.info(`[report-generation] ${reportId}: LLM generation succeeded`);
+  return parsed;
+}
+
+// ---------------------------------------------------------------------------
 // fetchExperimentsForGeneration — experiment query strategy
 //
 // Priority 1: If the report has explicitly linked records (junction table),
@@ -432,17 +618,52 @@ export async function runReportGeneration(
       linksLastSavedAt,
     );
 
-    const aiContent = buildAiContent(rows);
+    // -----------------------------------------------------------------------
+    // Generation: try LLM first, fall back to rule-based on any failure
+    // -----------------------------------------------------------------------
+
+    type GenerationSource = "llm" | "rule_fallback";
+    let aiContent: AiReportContent;
+    let generationSource: GenerationSource;
+    const generatedAt = new Date().toISOString();
+
+    const llmResult = await callLlmForReport(rows, reportId);
+
+    if (llmResult !== null) {
+      aiContent        = llmResult;
+      generationSource = "llm";
+    } else {
+      console.info(`[report-generation] ${reportId}: using rule_fallback`);
+      aiContent        = buildAiContent(rows);
+      generationSource = "rule_fallback";
+    }
+
+    // Embed generation metadata inside the JSON blob for diagnostics.
+    // The frontend ignores unknown fields — AiReportContent consumers are safe.
+    const storedJson = JSON.stringify({
+      ...aiContent,
+      _generationMeta: {
+        source:      generationSource,
+        model:       buildProviderConfig()?.model ?? "none",
+        generatedAt,
+        experimentCount: rows.length,
+      },
+    });
+
+    console.info(
+      `[report-generation] ${reportId}: saved — source=${generationSource}, experiments=${rows.length}`,
+    );
 
     await db
       .update(weeklyReportsTable)
       .set({
         generationStatus: "generated",
-        aiContentJson:    JSON.stringify(aiContent),
+        aiContentJson:    storedJson,
         experimentCount:  rows.length,
         updatedAt:        new Date(),
       })
       .where(eq(weeklyReportsTable.id, reportId));
+
   } catch (err) {
     console.error("[report-generation] runReportGeneration error:", err);
     try {

@@ -13,6 +13,11 @@
 
 import { Router, type IRouter } from "express";
 import crypto from "crypto";
+import {
+  buildProviderConfig,
+  callChat,
+  callChatJson,
+} from "../services/ai-client.service";
 
 const router: IRouter = Router();
 
@@ -28,138 +33,6 @@ interface ChatMessage {
 interface ChatRequest {
   messages: ChatMessage[];
   systemContext?: string;
-}
-
-interface ProviderConfig {
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-}
-
-// ---------------------------------------------------------------------------
-// Provider selection
-// ---------------------------------------------------------------------------
-
-function buildProviderConfig(): ProviderConfig | null {
-  const provider = process.env.AI_PROVIDER ?? "qianwen";
-
-  switch (provider) {
-    case "qianwen": {
-      const apiKey = process.env.DASHSCOPE_API_KEY ?? "";
-      if (!apiKey) return null;
-      return {
-        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        model:   process.env.AI_MODEL ?? "qwen-plus",
-        apiKey,
-      };
-    }
-
-    case "openai": {
-      const apiKey = process.env.OPENAI_API_KEY ?? "";
-      if (!apiKey) return null;
-      return {
-        baseUrl: process.env.AI_BASE_URL ?? "https://api.openai.com/v1",
-        model:   process.env.AI_MODEL ?? "gpt-4o-mini",
-        apiKey,
-      };
-    }
-
-    case "local": {
-      const apiKey = process.env.LOCAL_AI_API_KEY ?? "local";
-      return {
-        baseUrl: process.env.LOCAL_AI_BASE_URL ?? "http://localhost:11434/v1",
-        model:   process.env.AI_MODEL ?? "llama3",
-        apiKey,
-      };
-    }
-
-    default:
-      return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// OpenAI-compatible chat completions
-// ---------------------------------------------------------------------------
-
-async function callChat(
-  config: ProviderConfig,
-  systemPrompt: string,
-  messages: ChatMessage[],
-): Promise<string> {
-  const body = {
-    model: config.model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ],
-    temperature: 0.7,
-    max_tokens: 1024,
-  };
-
-  const res = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Provider error ${res.status}: ${text.slice(0, 200)}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const reply = data.choices?.[0]?.message?.content;
-  if (!reply) throw new Error("Provider returned empty reply");
-  return reply;
-}
-
-/** Call with JSON mode enabled — returns raw JSON string from the model. */
-async function callChatJson(
-  config: ProviderConfig,
-  systemPrompt: string,
-  userMessage: string,
-): Promise<string> {
-  const body = {
-    model: config.model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user",   content: userMessage },
-    ],
-    temperature: 0.3,
-    max_tokens: 4096,
-    response_format: { type: "json_object" },
-  };
-
-  const res = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Provider error ${res.status}: ${text.slice(0, 400)}`);
-  }
-
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-
-  const reply = data.choices?.[0]?.message?.content;
-  if (!reply) throw new Error("Provider returned empty reply");
-  return reply;
 }
 
 // ---------------------------------------------------------------------------
