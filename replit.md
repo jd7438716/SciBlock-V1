@@ -205,6 +205,36 @@ When AI is unavailable, `buildFallbackBlocks(evidenceLevel, missingHints)` retur
 
 ---
 
+## Experiment Report: Phase 3.1 — Readability & Structured Expression
+
+**Status**: Complete as of 2026-03-19.
+
+### What changed in Phase 3.1
+
+**1. Structured analysis/conclusion sub-fields (Option A)**
+- AI now returns `analysisMain` + `analysisLimitations` + `conclusionMain` + `conclusionNextSteps`
+- Renderer displays these as two distinct paragraphs per section
+- `analysisLimitations` is italicised with `证据边界：` prefix
+- `conclusionNextSteps` is italicised with `后续建议：` prefix
+- Monolithic `analysis` / `conclusion` fields kept for backward compatibility
+
+**2. evidenceLevel badge in report header**
+- Replaces `【注】` inline text approach
+- Rendered as inline-styled `<span>` in the header meta line (one occurrence, not per-section)
+- Three styled variants: `信息充分` (green), `信息有限` (amber), `信息不足` (red)
+- Academic and muted — uses light backgrounds with subtle borders
+
+**3. missingInfoHints as a proper subsection**
+- Moved from italic afterthought to a `建议补充信息` `<ol>` numbered list
+- Shown only for medium/low evidence (suppressed for high evidence)
+- Rendered after `conclusionNextSteps`, not mixed into the body text
+
+**4. Tier-aware fallback blocks extended**
+- `buildFallbackBlocks()` now returns all 4 new structured sub-fields
+- Each tier has specific `analysisMain`/`analysisLimitations`/`conclusionMain`/`conclusionNextSteps` text
+
+---
+
 ## Experiment Report: Phase 2.1 — Reliability Fixes
 
 **Status**: Complete as of 2026-03-19. Upgrades "可演示" → "可日常使用".

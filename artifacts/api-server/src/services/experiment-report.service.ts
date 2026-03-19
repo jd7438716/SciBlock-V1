@@ -162,6 +162,12 @@ interface ExperimentReportModel {
   backendMissingHints: string[];   // pre-computed, used in fallback + renderer
   // AI-generated fields
   aiSummary?: string;
+  // Phase 3.1: structured sub-fields (renderer-preferred; fall back to monolithic fields)
+  aiAnalysisMain?: string;
+  aiAnalysisLimitations?: string;
+  aiConclusionMain?: string;
+  aiConclusionNextSteps?: string;
+  // Monolithic fallback (used when structured sub-fields are absent)
   aiAnalysis?: string;
   aiConclusion?: string;
   aiEvidenceLevel?: EvidenceLevel;   // AI's own assessment (may differ slightly)
@@ -420,17 +426,16 @@ function sectionNum(sections: string[], key: string): string {
   return CHINESE_NUMS[idx] ?? String(idx + 1);
 }
 
-const EVIDENCE_NOTE: Record<EvidenceLevel, string> = {
-  high:   "",   // No prefix note needed — content speaks for itself
-  medium: "当前信息充分度有限，以下分析为初步判断，受现有记录范围约束。",
-  low:    "当前实验记录尚不完整，以下仅为记录性总结，不代表经验证的分析结论。",
+// Evidence badge — inline-styled span for the report header (academic, muted)
+const EVIDENCE_BADGE: Record<EvidenceLevel, string> = {
+  high:   `<span style="display:inline-block;padding:0 7px;border-radius:3px;font-size:0.82em;font-weight:500;border:1px solid #b6d9b0;background:#f0faf0;color:#2d6a3f;vertical-align:middle;">信息充分</span>`,
+  medium: `<span style="display:inline-block;padding:0 7px;border-radius:3px;font-size:0.82em;font-weight:500;border:1px solid #e5cc99;background:#fffbec;color:#7a5c1a;vertical-align:middle;">信息有限</span>`,
+  low:    `<span style="display:inline-block;padding:0 7px;border-radius:3px;font-size:0.82em;font-weight:500;border:1px solid #e8b4b4;background:#fff5f5;color:#8b2222;vertical-align:middle;">信息不足</span>`,
 };
 
-const CONCLUSION_NOTE: Record<EvidenceLevel, string> = {
-  high:   "",
-  medium: "以下为阶段性结论，有待补充数据后进一步验证。",
-  low:    "当前信息不足以形成明确结论，以下仅为初步记录。",
-};
+// Labels for the limitations / next-steps sub-paragraphs
+const ANALYSIS_LIMIT_LABEL = "证据边界：";
+const CONCLUSION_NEXT_LABEL = "后续建议：";
 
 function renderReportModel(m: ExperimentReportModel): string {
   const ts = new Date(m.generatedAt).toLocaleString("zh-CN", {
@@ -443,10 +448,12 @@ function renderReportModel(m: ExperimentReportModel): string {
 
   const blocks: string[] = [];
 
-  // Header
+  // Header — evidence badge placed here so it's visible once, not repeated per section
+  const evidenceBadge = EVIDENCE_BADGE[m.aiEvidenceLevel ?? m.evidenceLevel];
   const meta: string[] = [];
   if (m.experimentType) meta.push(`<strong>类型：</strong>${esc(m.experimentType)}`);
   meta.push(`<strong>生成时间：</strong>${ts}`);
+  meta.push(`<strong>信息充分度：</strong>${evidenceBadge}`);
   blocks.push(`<h1>${esc(m.title) || "（未命名实验）"}</h1>\n<p>${meta.join("　　")}</p>\n<hr>`);
 
   // 实验目的
@@ -537,20 +544,24 @@ function renderReportModel(m: ExperimentReportModel): string {
   blocks.push(mdsLines.join("\n"));
 
   // 结果分析 (AI or placeholder)
-  const analysisText = m.aiAnalysis;
-  const evidenceLevel = m.aiEvidenceLevel ?? m.evidenceLevel;
+  const resolvedLevel = m.aiEvidenceLevel ?? m.evidenceLevel;
   const findingsLines = [`<h2>${sectionNum(sections, "findings")}、结果分析</h2>`];
 
-  if (analysisText) {
-    const noteText = EVIDENCE_NOTE[evidenceLevel];
-    if (noteText) {
-      findingsLines.push(`<p><em>【注】${esc(noteText)}</em></p>`);
+  if (m.aiAnalysisMain || m.aiAnalysis) {
+    // Preferred: structured two-paragraph rendering
+    if (m.aiAnalysisMain) {
+      findingsLines.push(`<p>${esc(m.aiAnalysisMain)}</p>`);
+      if (m.aiAnalysisLimitations) {
+        findingsLines.push(`<p><em>${ANALYSIS_LIMIT_LABEL}${esc(m.aiAnalysisLimitations)}</em></p>`);
+      }
+    } else {
+      // Fallback monolithic text
+      findingsLines.push(`<p>${esc(m.aiAnalysis!)}</p>`);
     }
-    findingsLines.push(`<p>${esc(analysisText)}</p>`);
   } else {
     findingsLines.push(`<p><em>${esc(m.findingsPlaceholder)}</em></p>`);
     if (m.backendMissingHints.length > 0) {
-      findingsLines.push("<p><em>建议补充以下信息后重新生成报告：</em></p><ul>");
+      findingsLines.push(`<p><em>建议补充以下信息后重新生成报告：</em></p><ul>`);
       for (const hint of m.backendMissingHints.slice(0, 4)) {
         findingsLines.push(`<li><em>${esc(hint)}</em></li>`);
       }
@@ -560,24 +571,38 @@ function renderReportModel(m: ExperimentReportModel): string {
   blocks.push(findingsLines.join("\n"));
 
   // 实验结论 (AI or placeholder)
-  const conclusionText = m.aiConclusion;
   const concLines = [`<h2>${sectionNum(sections, "conclusion")}、实验结论</h2>`];
-  if (conclusionText) {
-    const noteText = CONCLUSION_NOTE[evidenceLevel];
-    if (noteText) {
-      concLines.push(`<p><em>【注】${esc(noteText)}</em></p>`);
-    }
-    concLines.push(`<p>${esc(conclusionText)}</p>`);
-    // Show AI missing info hints (if any) after conclusion
-    if (m.aiMissingInfoHints && m.aiMissingInfoHints.length > 0) {
-      concLines.push("<p><em>进一步完善建议：</em></p><ul>");
-      for (const hint of m.aiMissingInfoHints.slice(0, 3)) {
-        concLines.push(`<li><em>${esc(hint)}</em></li>`);
+  if (m.aiConclusionMain || m.aiConclusion) {
+    // Preferred: structured two-paragraph rendering
+    if (m.aiConclusionMain) {
+      concLines.push(`<p>${esc(m.aiConclusionMain)}</p>`);
+      if (m.aiConclusionNextSteps) {
+        concLines.push(`<p><em>${CONCLUSION_NEXT_LABEL}${esc(m.aiConclusionNextSteps)}</em></p>`);
       }
-      concLines.push("</ul>");
+    } else {
+      // Fallback monolithic text
+      concLines.push(`<p>${esc(m.aiConclusion!)}</p>`);
+    }
+
+    // missingInfoHints — rendered as a proper subsection for medium/low evidence
+    const hints = m.aiMissingInfoHints ?? [];
+    if (hints.length > 0 && resolvedLevel !== "high") {
+      concLines.push(`<p><strong>建议补充信息</strong></p><ol>`);
+      for (const hint of hints.slice(0, 3)) {
+        concLines.push(`<li>${esc(hint)}</li>`);
+      }
+      concLines.push("</ol>");
     }
   } else {
     concLines.push(`<p><em>${esc(m.conclusionPlaceholder)}</em></p>`);
+    // Show backend hints in placeholder state too (medium/low only)
+    if (m.backendMissingHints.length > 0 && resolvedLevel !== "high") {
+      concLines.push(`<p><strong>建议补充信息</strong></p><ol>`);
+      for (const hint of m.backendMissingHints.slice(0, 3)) {
+        concLines.push(`<li>${esc(hint)}</li>`);
+      }
+      concLines.push("</ol>");
+    }
   }
   blocks.push(concLines.join("\n"));
 
@@ -601,36 +626,52 @@ const EXPERIMENT_REPORT_SYSTEM_PROMPT = `你是科研实验室报告助理。根
 用户消息中会明确告知当前信息充分度级别：
 
 ▶ 级别：较充分
-- summary：可完整描述实验范围、目标、关键表征手段，语言可以稍有信心
-- analysis：可基于已记录的测量方法和数据类型讨论可能的分析维度，表述为"可观测到""理论上可用于判断"等，仍不得描述具体结果
-- conclusion：可回应实验目标，表述为"初步支持"或"有望验证"，需注明"有待实际数据验证"
+- summary：完整描述实验范围、目标、关键表征手段
+- analysisMain：基于已记录的测量方法讨论分析维度，表述为"可观测到""理论上可用于判断"，不得描述具体结果
+- analysisLimitations：明确指出尚无实测结果、哪些维度仍需数据支撑
+- conclusionMain：回应实验目标，表述"初步支持"或"有望验证"
+- conclusionNextSteps：指出获取更强支撑所需的后续步骤
 
 ▶ 级别：部分充分
-- summary：保守描述，重点放在"已完成什么"而非"预期什么"
-- analysis：必须明确表达"当前支持有限"，用"初步判断""仅能做记录层面的推断"等保守表述
-- conclusion：必须标注"阶段性""待进一步验证"，不得写正向结果性判断
+- summary：保守描述，聚焦"已完成什么"
+- analysisMain：只陈述有记录支撑的方面，表述为"仅能做初步判断"
+- analysisLimitations：明确写出当前支持有限的具体原因
+- conclusionMain：必须标注"阶段性"，不得写正向结果性判断
+- conclusionNextSteps：说明需要哪些数据才能得出更可靠结论
 
 ▶ 级别：明显不足
 - summary：只描述已记录的基础信息，不做推断
-- analysis：只做记录性总结，明确写"当前记录尚不支持结果分析"，说明缺少什么
-- conclusion：明确写"当前信息不足以形成有支撑的结论"，给出需补充的方向
+- analysisMain：只做记录性总结，明确写"当前记录尚不支持结果分析"
+- analysisLimitations：列出最关键的缺失项
+- conclusionMain：明确写"当前信息不足以形成有支撑的结论"
+- conclusionNextSteps：给出优先级最高的补充方向（1-2条）
 
 【写作风格要求】
 - 语言：学术中文，简洁克制，面向导师阅读，不夸张，不营销
-- 每个区块控制在 2-4 句话；必要时可适当展开，但避免冗长
+- 每个子字段控制在 1-3 句话
 - 结论必须回应实验目标：即便信息不足，也要说明"对目标 X 当前支撑程度"
 
 【输出格式 — 严格 JSON，不得有其他内容】
 {
-  "summary": "string",
-  "analysis": "string",
-  "conclusion": "string",
+  "summary": "string — 实验概述",
+  "analysis": "string — 完整结果分析（analysisMain + analysisLimitations 拼合，供降级使用）",
+  "analysisMain": "string — 核心分析判断",
+  "analysisLimitations": "string — 证据边界与局限说明",
+  "conclusion": "string — 完整实验结论（conclusionMain + conclusionNextSteps 拼合，供降级使用）",
+  "conclusionMain": "string — 当前阶段性结论",
+  "conclusionNextSteps": "string — 后续建议或验证方向",
   "evidenceLevel": "high" | "medium" | "low",
-  "missingInfoHints": ["string", ...] (0-3条，告知用户应补充什么)
+  "missingInfoHints": ["string", ...] (0-3条，告知用户具体缺少什么)
 }`;
 
 interface AiReportBlocks {
   summary: string;
+  // Phase 3.1: structured sub-fields (preferred over monolithic text)
+  analysisMain?: string;          // core analytical judgment
+  analysisLimitations?: string;   // evidence boundaries / what's missing
+  conclusionMain?: string;        // stage conclusion tied to objective
+  conclusionNextSteps?: string;   // what's needed to strengthen the conclusion
+  // Fallback monolithic fields (kept for backward compatibility)
   analysis: string;
   conclusion: string;
   evidenceLevel?: EvidenceLevel;
@@ -759,13 +800,22 @@ function buildExperimentPrompt(
   return lines.join("\n");
 }
 
+function optStr(d: Record<string, unknown>, key: string): boolean {
+  return d[key] === undefined || typeof d[key] === "string";
+}
+
 function validateAiBlocks(data: unknown): data is AiReportBlocks {
   if (typeof data !== "object" || data === null) return false;
   const d = data as Record<string, unknown>;
   if (typeof d["summary"] !== "string") return false;
   if (typeof d["analysis"] !== "string") return false;
   if (typeof d["conclusion"] !== "string") return false;
-  // Optional fields — accept if present and correct type
+  // Phase 3.1 structured sub-fields — all optional
+  if (!optStr(d, "analysisMain")) return false;
+  if (!optStr(d, "analysisLimitations")) return false;
+  if (!optStr(d, "conclusionMain")) return false;
+  if (!optStr(d, "conclusionNextSteps")) return false;
+  // Other optional fields
   if (d["evidenceLevel"] !== undefined && !["high", "medium", "low"].includes(d["evidenceLevel"] as string)) return false;
   if (d["missingInfoHints"] !== undefined && !Array.isArray(d["missingInfoHints"])) return false;
   return true;
@@ -812,28 +862,38 @@ async function callAiForReportBlocks(
 // ---------------------------------------------------------------------------
 
 function buildFallbackBlocks(evidenceLevel: EvidenceLevel, missingHints: string[]): AiReportBlocks {
-  const hintNote = missingHints.length > 0
-    ? ` 当前缺少：${missingHints.slice(0, 2).join("；")}。`
-    : "";
+  const hintJoined = missingHints.slice(0, 2).join("；");
 
   if (evidenceLevel === "high") {
     return {
-      summary:    "实验已完成主要步骤，记录较为完整，包含测量方法和数据类型等关键信息。具体分析请在数据整理后补充。",
-      analysis:   `当前记录包含测量方法和数据类型信息，具备初步分析的基础，但尚无实测结果数据，暂无法给出具体结论。建议在实验数据获取后重新生成报告。${hintNote}`,
-      conclusion: "本实验已完成关键操作步骤及表征方案部署，初步判断实验进展符合预期方向，但结论有待实际数据支撑。",
+      summary:             "实验已完成主要步骤，记录较为完整，包含测量方法和数据类型等关键信息。",
+      analysisMain:        "当前记录具备初步分析的基础，测量方案已明确，但尚无实测结果数据，暂无法给出具体判断。",
+      analysisLimitations: "证据边界：尚无实测结果数值，理论分析维度存在，但无法验证。建议在实验数据获取后重新生成报告。",
+      analysis:            "当前记录具备初步分析的基础，但尚无实测结果数据，暂无法给出具体判断。建议获取数据后重新生成。",
+      conclusionMain:      "本实验已完成关键操作步骤及表征方案部署，进展符合预期方向，但结论有待实际数据支撑。",
+      conclusionNextSteps: "后续建议：完成测量并记录数据结果后重新生成报告，以形成有依据的阶段性结论。",
+      conclusion:          "本实验已完成关键步骤，进展符合预期方向，但结论有待实际数据支撑。",
     };
   }
   if (evidenceLevel === "medium") {
     return {
-      summary:    "实验已记录部分过程信息，当前报告为阶段性总结，仍需进一步完善实验记录。",
-      analysis:   `当前实验记录支持有限，尚不能做完整结果分析。${hintNote} 建议补充完整测量条件和数据类型后重新生成。`,
-      conclusion: `当前信息尚不足以形成有充分支撑的结论，本报告为阶段性记录。${hintNote}`,
+      summary:             "实验已记录部分过程信息，当前报告为阶段性总结，仍需进一步完善实验记录。",
+      analysisMain:        "当前实验记录支持有限，仅能做记录层面的初步描述，尚不能形成完整结果分析。",
+      analysisLimitations: `证据边界：${hintJoined || "测量条件和数据结果尚不完整，分析依据有限"}。建议补充后重新生成。`,
+      analysis:            `当前实验记录支持有限，仅能做初步描述。${hintJoined ? "缺少：" + hintJoined + "。" : ""}建议完善后重新生成。`,
+      conclusionMain:      "当前信息尚不足以形成有充分支撑的结论，本报告为阶段性记录。",
+      conclusionNextSteps: `后续建议：${hintJoined || "补充测量数据和数据类型记录"}后重新生成，以获得更可靠的阶段性结论。`,
+      conclusion:          "当前信息尚不足以形成有充分支撑的结论，本报告为阶段性记录。",
     };
   }
   return {
-    summary:    "实验基本信息已创建，但当前记录尚不完整，建议补充实验系统、操作步骤和测量信息后重新生成。",
-    analysis:   `当前记录尚不支持结果分析。${hintNote} 请完善实验记录后重新生成报告。`,
-    conclusion: `当前信息明显不足，无法形成有效结论。${hintNote}`,
+    summary:             "实验基本信息已创建，但当前记录尚不完整，建议补充实验系统、操作步骤和测量信息后重新生成。",
+    analysisMain:        "当前记录尚不支持结果分析，信息明显不足。",
+    analysisLimitations: `证据边界：${hintJoined || "缺少测量方法、数据类型等关键记录"}，当前无法形成任何分析。`,
+    analysis:            `当前记录尚不支持结果分析。${hintJoined ? "缺少：" + hintJoined + "。" : ""}请完善实验记录后重新生成报告。`,
+    conclusionMain:      "当前信息明显不足，无法形成有效结论。",
+    conclusionNextSteps: `后续建议：优先补充${hintJoined || "实验目标、测量方法和数据类型"}，完善后重新生成报告。`,
+    conclusion:          `当前信息明显不足，无法形成有效结论。${hintJoined ? "建议补充：" + hintJoined + "。" : ""}`,
   };
 }
 
@@ -928,20 +988,28 @@ export async function generateAndSaveReport(
   const aiBlocks = await callAiForReportBlocks(model, aiContext, experimentId);
 
   if (aiBlocks) {
-    model.aiSummary          = aiBlocks.summary;
-    model.aiAnalysis         = aiBlocks.analysis;
-    model.aiConclusion       = aiBlocks.conclusion;
-    model.aiEvidenceLevel    = aiBlocks.evidenceLevel;
-    model.aiMissingInfoHints = Array.isArray(aiBlocks.missingInfoHints)
+    model.aiSummary             = aiBlocks.summary;
+    model.aiAnalysis            = aiBlocks.analysis;          // monolithic fallback kept
+    model.aiAnalysisMain        = aiBlocks.analysisMain;
+    model.aiAnalysisLimitations = aiBlocks.analysisLimitations;
+    model.aiConclusion          = aiBlocks.conclusion;        // monolithic fallback kept
+    model.aiConclusionMain      = aiBlocks.conclusionMain;
+    model.aiConclusionNextSteps = aiBlocks.conclusionNextSteps;
+    model.aiEvidenceLevel       = aiBlocks.evidenceLevel;
+    model.aiMissingInfoHints    = Array.isArray(aiBlocks.missingInfoHints)
       ? aiBlocks.missingInfoHints.filter((h): h is string => typeof h === "string").slice(0, 3)
       : undefined;
     model.source = "ai";
   } else {
     // Tier-aware fallback
     const fallback = buildFallbackBlocks(evidenceLevel, backendMissingHints);
-    model.aiSummary    = fallback.summary;
-    model.aiAnalysis   = fallback.analysis;
-    model.aiConclusion = fallback.conclusion;
+    model.aiSummary             = fallback.summary;
+    model.aiAnalysisMain        = fallback.analysisMain;
+    model.aiAnalysisLimitations = fallback.analysisLimitations;
+    model.aiAnalysis            = fallback.analysis;
+    model.aiConclusionMain      = fallback.conclusionMain;
+    model.aiConclusionNextSteps = fallback.conclusionNextSteps;
+    model.aiConclusion          = fallback.conclusion;
     model.source = "stub";
   }
 
