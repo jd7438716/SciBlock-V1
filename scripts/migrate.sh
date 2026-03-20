@@ -49,25 +49,26 @@ log_ok()    { echo -e "${GREEN}[migrate]${NC} $*"; }
 log_error() { echo -e "${RED}[migrate]${NC} $*" >&2; }
 
 # ---------------------------------------------------------------------------
-# Resolve DB URL — EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
+# Resolve DB URL — exclusively uses EXTERNAL_DATABASE_URL.
+# Replit's managed DATABASE_URL is intentionally not used.
 # ---------------------------------------------------------------------------
-DB_URL="${EXTERNAL_DATABASE_URL:-${DATABASE_URL:-}}"
+DB_URL="${EXTERNAL_DATABASE_URL:-}"
 
 if [ -z "$DB_URL" ]; then
-  log_error "Neither EXTERNAL_DATABASE_URL nor DATABASE_URL is set."
-  log_error "Example: export EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db"
+  log_error "EXTERNAL_DATABASE_URL is not set."
+  log_error "Add it in Replit Secrets: EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db"
   exit 1
 fi
 
 # Log the active connection (host + database only — no password).
 _CONN_SAFE=$(node -e "
 try {
-  const u = new URL(process.env.EXTERNAL_DATABASE_URL || process.env.DATABASE_URL || '');
+  const u = new URL(process.env.EXTERNAL_DATABASE_URL || '');
   process.stdout.write(u.hostname + ':' + (u.port || '5432') + u.pathname);
 } catch { process.stdout.write('(unparseable)'); }
 " 2>/dev/null || echo "(unknown)")
 
-log "DB source : ${EXTERNAL_DATABASE_URL:+EXTERNAL_DATABASE_URL}${EXTERNAL_DATABASE_URL:-DATABASE_URL}"
+log "DB source : EXTERNAL_DATABASE_URL"
 log "DB conn   : ${_CONN_SAFE}"
 
 # ---------------------------------------------------------------------------

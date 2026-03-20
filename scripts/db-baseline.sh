@@ -45,11 +45,11 @@ log_error() { echo -e "${RED}[baseline]${NC} $*" >&2; }
 # ---------------------------------------------------------------------------
 # Preconditions
 # ---------------------------------------------------------------------------
-# Resolve DB URL — EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
-DB_URL="${EXTERNAL_DATABASE_URL:-${DATABASE_URL:-}}"
+# Exclusively uses EXTERNAL_DATABASE_URL — Replit's managed DATABASE_URL is not used.
+DB_URL="${EXTERNAL_DATABASE_URL:-}"
 
 if [ -z "$DB_URL" ]; then
-  log_error "Neither EXTERNAL_DATABASE_URL nor DATABASE_URL is set."
+  log_error "EXTERNAL_DATABASE_URL is not set."
   exit 1
 fi
 

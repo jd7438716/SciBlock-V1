@@ -1,24 +1,20 @@
 import { defineConfig } from "drizzle-kit";
 
 // ---------------------------------------------------------------------------
-// Connection string resolution
+// Drizzle migration config — exclusively uses EXTERNAL_DATABASE_URL.
 //
-// EXTERNAL_DATABASE_URL takes priority over DATABASE_URL.
-// This mirrors the runtime resolution in lib/db/src/index.ts so that
+// Replit's managed DATABASE_URL is intentionally NOT used as a fallback.
+// Mirrors the runtime resolution in lib/db/src/index.ts so that
 // `drizzle-kit generate` and `drizzle-kit migrate` always target the same
 // database instance as the running API server.
-//
-//   Set EXTERNAL_DATABASE_URL to use an external/self-managed Postgres.
-//   Unset it to fall back to the Replit-managed internal database.
 // ---------------------------------------------------------------------------
-const dbUrl =
-  process.env.EXTERNAL_DATABASE_URL ||
-  process.env.DATABASE_URL;
+
+const dbUrl = process.env.EXTERNAL_DATABASE_URL;
 
 if (!dbUrl) {
   throw new Error(
-    "Neither EXTERNAL_DATABASE_URL nor DATABASE_URL is set. " +
-    "Provision a database or set EXTERNAL_DATABASE_URL.",
+    "EXTERNAL_DATABASE_URL is not set. " +
+    "Add it in Replit Secrets → EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db",
   );
 }
 

@@ -5,25 +5,18 @@ import * as schema from "./schema";
 const { Pool } = pg;
 
 // ---------------------------------------------------------------------------
-// Connection string resolution
+// Database connection — exclusively uses EXTERNAL_DATABASE_URL.
 //
-// EXTERNAL_DATABASE_URL takes priority over DATABASE_URL.
-// This allows safe, reversible switching to an external database without
-// removing the Replit-managed DATABASE_URL secret.
-//
-//   Set EXTERNAL_DATABASE_URL to point at your external PG instance.
-//   Unset (or delete) it to fall back to the Replit internal database.
+// Replit's managed DATABASE_URL is intentionally NOT used as a fallback.
+// Set EXTERNAL_DATABASE_URL in Replit Secrets to point at your PostgreSQL.
 // ---------------------------------------------------------------------------
 
-const externalUrl  = process.env.EXTERNAL_DATABASE_URL;
-const internalUrl  = process.env.DATABASE_URL;
-const connectionString = externalUrl || internalUrl;
-const dbSource     = externalUrl ? "EXTERNAL_DATABASE_URL" : "DATABASE_URL";
+const connectionString = process.env.EXTERNAL_DATABASE_URL;
 
 if (!connectionString) {
   throw new Error(
-    "[db] Neither EXTERNAL_DATABASE_URL nor DATABASE_URL is set. " +
-    "Provision a database or set EXTERNAL_DATABASE_URL.",
+    "[db] EXTERNAL_DATABASE_URL is not set. " +
+    "Add it in Replit Secrets → EXTERNAL_DATABASE_URL=postgresql://user:pass@host:5432/db",
   );
 }
 
@@ -40,7 +33,7 @@ function safeConnInfo(url: string): string {
   }
 }
 
-console.info(`[db] source=${dbSource}  conn=${safeConnInfo(connectionString)}`);
+console.info(`[db] source=EXTERNAL_DATABASE_URL  conn=${safeConnInfo(connectionString)}`);
 
 export const pool = new Pool({ connectionString });
 export const db   = drizzle(pool, { schema });
@@ -48,8 +41,6 @@ export const db   = drizzle(pool, { schema });
 // ---------------------------------------------------------------------------
 // Startup read probe — confirms tables are accessible immediately on import.
 // Runs asynchronously; does NOT block module initialisation.
-// Logs a warning (not a fatal error) so a transient hiccup doesn't crash the
-// server before it can serve health-check requests.
 // ---------------------------------------------------------------------------
 pool.query<{ cnt: string }>("SELECT COUNT(*)::text AS cnt FROM users")
   .then(({ rows }) => {

@@ -40,15 +40,15 @@ log()       { echo -e "${YELLOW}[seed-dev]${NC} $*"; }
 log_ok()    { echo -e "${GREEN}[seed-dev]${NC} $*"; }
 log_error() { echo -e "${RED}[seed-dev]${NC} $*" >&2; }
 
-# Resolve DB URL — EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
-DB_URL="${EXTERNAL_DATABASE_URL:-${DATABASE_URL:-}}"
+# Exclusively uses EXTERNAL_DATABASE_URL — Replit's managed DATABASE_URL is not used.
+DB_URL="${EXTERNAL_DATABASE_URL:-}"
 
 if [ -z "$DB_URL" ]; then
-  log_error "Neither EXTERNAL_DATABASE_URL nor DATABASE_URL is set."
+  log_error "EXTERNAL_DATABASE_URL is not set."
   exit 1
 fi
 
-# Export so child scripts (seed-dev-user.sh) inherit the resolved URL.
+# Export as DATABASE_URL so child scripts (seed-dev-user.sh) can read it.
 export DATABASE_URL="$DB_URL"
 
 # ---------------------------------------------------------------------------

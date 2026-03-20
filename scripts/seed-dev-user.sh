@@ -18,11 +18,11 @@
 
 set -euo pipefail
 
-# Resolve DB URL — EXTERNAL_DATABASE_URL takes priority over DATABASE_URL
-DB_URL="${EXTERNAL_DATABASE_URL:-${DATABASE_URL:-}}"
+# Exclusively uses EXTERNAL_DATABASE_URL — Replit's managed DATABASE_URL is not used.
+DB_URL="${EXTERNAL_DATABASE_URL:-}"
 
 if [ -z "$DB_URL" ]; then
-  echo "[seed] ERROR: Neither EXTERNAL_DATABASE_URL nor DATABASE_URL is set." >&2
+  echo "[seed] ERROR: EXTERNAL_DATABASE_URL is not set." >&2
   exit 1
 fi
 

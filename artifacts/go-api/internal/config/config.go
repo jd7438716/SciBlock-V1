@@ -66,19 +66,18 @@ type Config struct {
 
 // Load reads environment variables and returns a Config.
 // Missing optional variables fall back to safe defaults.
-// Missing required variables (DATABASE_URL, JWT_SECRET) log a fatal error.
+// Missing required variables (EXTERNAL_DATABASE_URL, JWT_SECRET) log a fatal error.
 //
-// Database URL resolution order:
-//  1. EXTERNAL_DATABASE_URL (if set, used as-is — enables safe external DB switching)
-//  2. DATABASE_URL           (Replit-managed internal database — always present as fallback)
+// Database URL: exclusively reads EXTERNAL_DATABASE_URL.
+// Replit's managed DATABASE_URL is intentionally not used.
 func Load() *Config {
-        dbURL, dbSource := resolveDBURL()
+        dbURL := mustGetEnv("EXTERNAL_DATABASE_URL")
 
         cfg := &Config{
                 Port:           getEnv("PORT", "8082"),
                 Env:            getEnv("ENV", "development"),
                 DatabaseURL:    dbURL,
-                DatabaseSource: dbSource,
+                DatabaseSource: "EXTERNAL_DATABASE_URL",
                 JWTSecret:      mustGetEnv("JWT_SECRET"),
                 JWTExpiryHours: getEnvInt("JWT_EXPIRY_HOURS", 168),
                 BcryptCost:     getEnvInt("BCRYPT_COST", 12),
@@ -86,18 +85,6 @@ func Load() *Config {
                 CORSOrigins:    parseCORSOrigins(os.Getenv("CORS_ORIGINS")),
         }
         return cfg
-}
-
-// resolveDBURL picks the active database URL and records which env var supplied it.
-func resolveDBURL() (dbURL, source string) {
-        if v := os.Getenv("EXTERNAL_DATABASE_URL"); v != "" {
-                return v, "EXTERNAL_DATABASE_URL"
-        }
-        v := os.Getenv("DATABASE_URL")
-        if v == "" {
-                log.Fatal("required environment variable \"DATABASE_URL\" is not set")
-        }
-        return v, "DATABASE_URL"
 }
 
 // SafeConnInfo returns a loggable "host:port/database" string derived from
