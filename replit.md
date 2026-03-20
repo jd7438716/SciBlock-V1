@@ -64,6 +64,14 @@ The project utilizes a pnpm monorepo structure, separating deployable services (
 **Database Migration Strategy**:
 -   Drizzle manages tables owned by the Express API.
 -   Goose manages tables owned by the Go API. Both target the same PostgreSQL database with idempotent migrations.
+-   Goose gracefully handles "already fully migrated" databases (treats `ErrNoNextVersion` as success).
+
+**Database Switching (`EXTERNAL_DATABASE_URL`)**:
+Both the Express API (`lib/db/src/index.ts`) and the Go API (`artifacts/go-api/internal/config/config.go`) resolve their connection string with this priority order:
+1. `EXTERNAL_DATABASE_URL` — if set, used as-is (external/self-managed Postgres).
+2. `DATABASE_URL` — Replit-managed internal database (always present as fallback).
+
+On startup, both services log `source=EXTERNAL_DATABASE_URL|DATABASE_URL  conn=host:port/db` (no password) and run a read probe (`SELECT COUNT(*) FROM users`) to confirm connectivity before serving traffic. To switch back to the internal DB, simply unset `EXTERNAL_DATABASE_URL`.
 
 # Completed Capabilities
 

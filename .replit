@@ -53,6 +53,7 @@ JWT_SECRET = "sciblock-jwt-dev-secret-change-in-prod"
 AI_PROVIDER = "openai"
 AI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 AI_MODEL = "qwen-plus"
+EXTERNAL_DATABASE_URL = "postgresql://postgres:081e547e37a0f121dbed1c930171365d@114.132.84.75:5432/sciblock_v1"
 
 [nix]
 channel = "stable-25_05"

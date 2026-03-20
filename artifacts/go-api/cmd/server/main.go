@@ -16,6 +16,7 @@ package main
 import (
         "context"
         "database/sql"
+        "errors"
         "fmt"
         "log"
         "net/http"
@@ -50,12 +51,22 @@ func main() {
         // -------------------------------------------------------------------------
         // Database
         // -------------------------------------------------------------------------
+        log.Printf("database source=%s  conn=%s", cfg.DatabaseSource, cfg.SafeConnInfo())
         pool, err := db.Connect(cfg.DatabaseURL)
         if err != nil {
                 log.Fatalf("database connection failed: %v", err)
         }
         defer pool.Close()
         log.Println("database connected")
+
+        // Read probe — confirm tables are accessible before accepting traffic.
+        var userCount int
+        if err := pool.QueryRow(context.Background(),
+                "SELECT COUNT(*) FROM users").Scan(&userCount); err != nil {
+                log.Printf("WARN: read probe failed — %v (continuing, but check DB connectivity)", err)
+        } else {
+                log.Printf("read probe OK — users table row count: %d", userCount)
+        }
 
         // -------------------------------------------------------------------------
         // Migrations (optional — only when AUTO_MIGRATE=true)
@@ -136,6 +147,10 @@ func runMigrations(databaseURL string) error {
                 return fmt.Errorf("set goose dialect: %w", err)
         }
         if err := goose.Up(sqlDB, "migrations"); err != nil {
+                // ErrNoNextVersion means "already fully migrated" — not an error condition.
+                if errors.Is(err, goose.ErrNoNextVersion) {
+                        return nil
+                }
                 return fmt.Errorf("goose up: %w", err)
         }
         return nil
